@@ -1,0 +1,124 @@
+# Multi-step automation tasks (LEARNING.md "Measuring"): the kind of chore a user repeats, which
+# learned skills are meant to make shorter and surer. Each family also has training requests in
+# internal/eval/workload/, used by `noskill eval simulate`; these are held out from that workload
+# (different names and contents), so a learned skill is never graded on its own source run.
+- id: multi-01
+  type: multi
+  family: sort-by-type
+  skills: [files]
+  writes: true
+  prompt: "Tidy up {dir}: put every .txt file into a folder named text and every .csv file into a folder named tables."
+  files: { minutes.txt: m, ideas.txt: i, sales.csv: "a,b", stock.csv: "c,d", photo.png: p }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [text/minutes.txt, text/ideas.txt, tables/sales.csv, tables/stock.csv, photo.png], absent: [minutes.txt, sales.csv] }
+- id: multi-02
+  type: multi
+  family: sort-by-type
+  skills: [files]
+  writes: true
+  prompt: "Tidy up {dir}: put every .md file into a folder named docs and every .json file into a folder named data."
+  files: { readme.md: r, guide.md: g, a.json: "{}", b.json: "[]", keep.txt: k }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [docs/readme.md, docs/guide.md, data/a.json, data/b.json, keep.txt], absent: [readme.md, b.json] }
+- id: multi-03
+  type: multi
+  family: log-errors
+  skills: [files]
+  writes: true
+  prompt: "Read {dir}/server.log, write every line that contains ERROR to {dir}/errors.txt, and tell me how many there were. End with just the number."
+  files: { server.log: "INFO start\nERROR disk full\nINFO retry\nERROR timeout on db\nWARN slow\nERROR auth failed\n" }
+  tools: [write_text]
+  check: { number: 3 }
+  end: { file_has: { errors.txt: timeout on db }, file_lacks: { errors.txt: WARN slow } }
+- id: multi-04
+  type: multi
+  family: log-errors
+  skills: [files]
+  writes: true
+  prompt: "Read {dir}/worker.log, write every line that contains ERROR to {dir}/errors.txt, and tell me how many there were. End with just the number."
+  files: { worker.log: "ERROR queue stuck\nINFO job 1 done\nINFO job 2 done\nERROR job 3 crashed\n" }
+  tools: [write_text]
+  check: { number: 2 }
+  end: { file_has: { errors.txt: job 3 crashed }, file_lacks: { errors.txt: job 2 done } }
+- id: multi-05
+  type: multi
+  family: archive-prefix
+  skills: [files]
+  writes: true
+  prompt: "Make a folder {dir}/old and move every file whose name starts with 2022- into it."
+  files: { 2022-q1.txt: a, 2022-q2.txt: b, 2023-q1.txt: c, notes.txt: d }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [old/2022-q1.txt, old/2022-q2.txt, 2023-q1.txt, notes.txt], absent: [2022-q1.txt, 2022-q2.txt] }
+- id: multi-06
+  type: multi
+  family: archive-prefix
+  skills: [files]
+  writes: true
+  prompt: "Make a folder {dir}/done and move every file whose name starts with closed- into it."
+  files: { closed-41.txt: a, closed-42.txt: b, closed-50.txt: c, open-51.txt: d }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [done/closed-41.txt, done/closed-42.txt, done/closed-50.txt, open-51.txt], absent: [closed-41.txt, closed-50.txt] }
+- id: multi-07
+  type: multi
+  family: rename-prefix
+  skills: [files]
+  writes: true
+  prompt: "Rename every .jpg file in {dir} by adding the prefix beach- to its name (so a.jpg becomes beach-a.jpg). Leave other files alone."
+  files: { sun.jpg: s, sand.jpg: d, map.pdf: m }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [beach-sun.jpg, beach-sand.jpg, map.pdf], absent: [sun.jpg, sand.jpg, beach-map.pdf] }
+- id: multi-08
+  type: multi
+  family: rename-prefix
+  skills: [files]
+  writes: true
+  prompt: "Rename every .wav file in {dir} by adding the prefix take- to its name (so a.wav becomes take-a.wav). Leave other files alone."
+  files: { intro.wav: i, verse.wav: v, outro.wav: o, lyrics.txt: l }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [take-intro.wav, take-verse.wav, take-outro.wav, lyrics.txt], absent: [intro.wav, outro.wav, take-lyrics.txt] }
+- id: multi-09
+  type: multi
+  family: backup-copy
+  skills: [files]
+  writes: true
+  prompt: "Copy every .md file in {dir} into a folder {dir}/backup, keeping the originals where they are."
+  files: { plan.md: "the plan", diary.md: "dear diary", photo.jpg: p }
+  tools: [copy_verify]
+  check: { answered: true }
+  end: { exists: [plan.md, diary.md, photo.jpg], absent: [backup/photo.jpg], file_has: { backup/plan.md: the plan, backup/diary.md: dear diary } }
+- id: multi-10
+  type: multi
+  family: backup-copy
+  skills: [files]
+  writes: true
+  prompt: "Copy every .yaml file in {dir} into a folder {dir}/backup, keeping the originals where they are."
+  files: { app.yaml: "port: 1", db.yaml: "host: x", ci.yaml: "on: push", run.sh: r }
+  tools: [copy_verify]
+  check: { answered: true }
+  end: { exists: [app.yaml, db.yaml, ci.yaml], absent: [backup/run.sh], file_has: { backup/app.yaml: "port: 1", backup/db.yaml: "host: x", backup/ci.yaml: "on: push" } }
+- id: multi-11
+  type: multi
+  family: combine-text
+  skills: [files]
+  writes: true
+  prompt: "Read every .txt file in {dir} and write a new file {dir}/all.txt that contains all of their lines."
+  files: { a.txt: "alpha line", b.txt: "bravo line", c.txt: "charlie line" }
+  tools: [write_text]
+  check: { answered: true }
+  end: { file_has: { all.txt: bravo line } }
+- id: multi-12
+  type: multi
+  family: combine-text
+  skills: [files]
+  writes: true
+  prompt: "Read every .txt file in {dir} and write a new file {dir}/all.txt that contains all of their lines."
+  files: { mon.txt: "ran 5 km", tue.txt: "rested", wed.txt: "swam 1 km", thu.txt: "ran 8 km" }
+  tools: [write_text]
+  check: { answered: true }
+  end: { file_has: { all.txt: swam 1 km } }

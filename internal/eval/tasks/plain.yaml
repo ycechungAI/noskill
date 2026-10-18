@@ -1,0 +1,236 @@
+# Plain tasks: one model call, no tools. `bench: true` ones also run in `noskill models bench`.
+- id: chat-01
+  type: chat
+  bench: true
+  prompt: "What is the capital of France? Answer in one word."
+  check: { contains: [paris] }
+- id: chat-02
+  type: chat
+  prompt: "Which planet is known as the Red Planet? One word."
+  check: { contains: [mars] }
+- id: chat-03
+  type: chat
+  bench: true
+  prompt: "How many days are in a leap year? Just the number."
+  check: { number: 366 }
+- id: chat-04
+  type: chat
+  prompt: "What is the chemical symbol for gold? Just the symbol."
+  check: { regex: ['\bAu\b'] }
+- id: chat-05
+  type: chat
+  prompt: "Name the largest ocean on Earth in one word."
+  check: { contains: [pacific] }
+- id: chat-06
+  type: chat
+  prompt: "Who wrote the play Romeo and Juliet? Give just the surname."
+  check: { contains: [shakespeare] }
+
+- id: reasoning-01
+  type: reasoning
+  bench: true
+  prompt: "Alice is taller than Bob. Bob is taller than Carol. Who is the shortest? One word."
+  check: { contains: [carol], not: [alice, bob] }
+- id: reasoning-02
+  type: reasoning
+  prompt: "If all bloops are razzies and all razzies are lazzies, are all bloops lazzies? Answer yes or no."
+  check: { regex: ['(?i)^\W*yes'] }
+- id: reasoning-03
+  type: reasoning
+  bench: true
+  prompt: "A farmer has 17 sheep. All but 9 run away. How many are left? Just the number."
+  check: { number: 9 }
+- id: reasoning-04
+  type: reasoning
+  prompt: "What comes next in the sequence 2, 6, 12, 20, 30? Just the number."
+  check: { number: 42 }
+- id: reasoning-05
+  type: reasoning
+  prompt: "Tom is twice as old as Sam. Sam is 8. How old will Tom be in 4 years? Just the number."
+  check: { number: 20 }
+- id: reasoning-06
+  type: reasoning
+  prompt: "Which is heavier: a kilogram of feathers or a kilogram of iron? Answer 'same', 'feathers' or 'iron'."
+  check: { any: [same, equal] }
+
+- id: math-01
+  type: math
+  bench: true
+  prompt: "What is 17 * 23? Just the number."
+  check: { number: 391 }
+- id: math-02
+  type: math
+  prompt: "What is 144 divided by 12? Just the number."
+  check: { number: 12 }
+- id: math-03
+  type: math
+  prompt: "What is 15% of 240? Just the number."
+  check: { number: 36 }
+- id: math-04
+  type: math
+  bench: true
+  prompt: "Solve for x: 3x + 7 = 28. Just the number."
+  check: { number: 7 }
+- id: math-05
+  type: math
+  prompt: "What is the square root of 169? Just the number."
+  check: { number: 13 }
+- id: math-06
+  type: math
+  prompt: "What is 2 to the power of 10? Just the number."
+  check: { number: 1024 }
+- id: math-07
+  type: math
+  prompt: "A train travels 180 km in 2.5 hours. What is its average speed in km/h? Just the number."
+  check: { number: 72 }
+- id: math-08
+  type: math
+  prompt: "What is the sum of the integers from 1 to 20? Just the number."
+  check: { number: 210 }
+
+- id: code-01
+  type: code
+  bench: true
+  prompt: "Write a Python function is_even(n) that returns True if n is even. Reply with only the code."
+  check: { regex: ['def\s+is_even\s*\(\s*n\s*\)'], any: ["% 2", "%2", "& 1", "&1"] }
+- id: code-02
+  type: code
+  prompt: "What does the Python expression len('hello') return? Just the number."
+  check: { number: 5 }
+- id: code-03
+  type: code
+  prompt: "In Python, what is the output of print(3 * 'ab')? Just the output."
+  check: { contains: [ababab] }
+- id: code-04
+  type: code
+  prompt: "Which Python keyword defines a function? One word."
+  check: { regex: ['\bdef\b'] }
+- id: code-05
+  type: code
+  prompt: "Write a JavaScript function add(a, b) that returns their sum. Reply with only the code."
+  check: { regex: ['\badd\b'], any: [return, "=>"] }
+- id: code-06
+  type: code
+  prompt: "This Python line has a syntax error: for i in range(3) print(i). What character is missing? Name it."
+  check: { any: [colon, ":"] }
+- id: code-07
+  type: code
+  bench: true
+  prompt: "In Python, how do you get the last element of a list named xs? Reply with only the expression."
+  check: { contains: ["xs[-1]"] }
+- id: code-08
+  type: code
+  prompt: "In SQL, which clause filters rows: WHERE or ORDER BY? One word."
+  check: { contains: [where], not: ["order by"] }
+
+- id: summarise-01
+  type: summarise
+  bench: true
+  prompt: |
+    Summarise in one sentence of fewer than 30 words:
+
+    The city council met on Tuesday to discuss the new bike lane proposal. After three hours of debate, the council voted 7 to 2 to approve the plan. Construction will begin in March and is expected to cost 1.2 million dollars.
+  check: { any: [bike, lane], max_words: 35 }
+- id: summarise-02
+  type: summarise
+  prompt: |
+    Summarise in one sentence of fewer than 25 words:
+
+    Researchers at a coastal university found that seagrass meadows store carbon up to thirty times faster than tropical forests. They warn that dredging and pollution have destroyed a third of the world's meadows since 1980, and call for protected marine zones.
+  check: { any: [seagrass, meadow], max_words: 30 }
+- id: summarise-03
+  type: summarise
+  prompt: |
+    Summarise in one sentence of fewer than 25 words:
+
+    The library will close early on Friday for staff training and reopen at the usual time on Saturday. Books due on Friday can be returned in the outdoor drop box, and no late fees will be charged for that day.
+  check: { any: [library, close], max_words: 30 }
+- id: summarise-04
+  type: summarise
+  prompt: |
+    Summarise in two or three words what this message is about:
+
+    Hi team, the quarterly budget review has moved to next Thursday at 2pm. Please send your department figures by Wednesday noon.
+  check: { any: [budget], max_words: 8 }
+- id: summarise-05
+  type: summarise
+  prompt: |
+    Give a title of at most 6 words for this text:
+
+    A new bakery opened on Main Street this week, offering sourdough bread, pastries and coffee. Owner Lena Park says she baked her first loaf at age twelve.
+  check: { any: [bakery, bread], max_words: 8 }
+
+- id: extract-01
+  type: extract
+  bench: true
+  prompt: "Extract the name and age as JSON with keys name and age. Text: 'Maria Lopez is 34 years old and lives in Madrid.' Reply with only the JSON."
+  check: { json: { name: Maria Lopez, age: 34 } }
+- id: extract-02
+  type: extract
+  prompt: "Extract the date and city as JSON with keys date and city (date as YYYY-MM-DD). Text: 'The conference takes place in Berlin on 12 March 2027.' Reply with only the JSON."
+  check: { json: { date: "2027-03-12", city: Berlin } }
+- id: extract-03
+  type: extract
+  prompt: "List every email address in this text, one per line. Text: 'Contact anna@example.com or bob@test.org for details.'"
+  check: { contains: ["anna@example.com", "bob@test.org"] }
+- id: extract-04
+  type: extract
+  bench: true
+  prompt: "Add up the prices and give the total as JSON with key total (a number). Text: 'Items: pen 2.50, notebook 4.00, bag 13.50.' Reply with only the JSON."
+  check: { json: { total: 20 } }
+- id: extract-05
+  type: extract
+  prompt: "Extract JSON with keys product and quantity. Text: 'Please send 12 widgets to the warehouse.' Reply with only the JSON."
+  check: { json: { product: widget, quantity: 12 } }
+- id: extract-06
+  type: extract
+  prompt: "Extract all hashtags as a JSON array of strings under the key tags. Tweet: 'Loving the sunset #beach #summer2027 with friends'. Reply with only the JSON."
+  check: { json: { tags: [beach, summer2027] } }
+
+- id: translate-01
+  type: translate
+  bench: true
+  prompt: "Translate to French: 'Good morning'. Only the translation."
+  check: { contains: [bonjour] }
+- id: translate-02
+  type: translate
+  prompt: "Translate to Spanish: 'Thank you very much'. Only the translation."
+  check: { contains: [muchas gracias] }
+- id: translate-03
+  type: translate
+  prompt: "Translate to German: 'Where is the train station?' Only the translation."
+  check: { contains: [bahnhof] }
+- id: translate-04
+  type: translate
+  prompt: "Translate to English: 'Ich habe Hunger.' Only the translation."
+  check: { any: [hungry, hunger] }
+- id: translate-05
+  type: translate
+  prompt: "Translate to English: 'Il fait très froid aujourd'hui.' Only the translation."
+  check: { contains: [cold] }
+
+- id: creative-01
+  type: creative
+  prompt: "Write a haiku about rain. Three lines only, nothing else."
+  check: { lines: 3 }
+- id: creative-02
+  type: creative
+  prompt: "Suggest a name for a coffee shop. Reply with only the name, at most 4 words."
+  check: { max_words: 4 }
+- id: creative-03
+  type: creative
+  prompt: "Write a two-sentence story about a dragon."
+  check: { contains: [dragon], max_words: 80 }
+
+- id: plan-01
+  type: plan
+  prompt: "List exactly three steps to make a cup of tea, numbered 1 to 3."
+  check: { regex: ['1[.)]', '3[.)]'], not_regex: ['4[.)]'] }
+- id: plan-02
+  type: plan
+  prompt: "Plan a 3-day study schedule for an exam: one line per day, starting with Day 1, Day 2, Day 3."
+  check: { contains: ["day 1", "day 2", "day 3"] }
+- id: plan-03
+  type: plan
+  prompt: "Put these tasks in a logical order: deploy, write code, test. Reply with the three tasks separated by commas."
+  check: { regex: ['(?i)write code\W+test\W+deploy'] }

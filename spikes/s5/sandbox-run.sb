@@ -1,0 +1,17 @@
+; S5: run Hermes itself. Writes only under spikes/s5/out and temp; reads nothing under /Users/neolinux except spikes/s5;
+; network only to this machine (the local model server). Everything else is allowed so the OS-level plumbing works.
+(version 1)
+(allow default)
+(deny file-write*)
+(allow file-write*
+  (subpath "/Users/neolinux/dev/noskill/spikes/s5/out")
+  (subpath "/private/tmp") (subpath "/private/var/folders") (subpath "/dev"))
+(deny file-read* (subpath "/Users/neolinux"))
+(allow file-read-metadata)
+(allow file-read* (subpath "/Users/neolinux/dev/noskill/spikes/s5"))
+(deny network*)
+(allow network* (remote ip "localhost:*"))
+(allow network* (remote unix-socket))
+(allow network* (local unix-socket))
+(allow network-bind (local unix-socket) (local ip "localhost:*"))
+(allow network-inbound (local unix-socket) (local ip "localhost:*"))

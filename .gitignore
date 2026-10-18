@@ -1,0 +1,18 @@
+.DS_Store
+
+# Built docs site: `go run ./scripts/docsite` makes it.
+/site/
+
+# Local tooling and live job status files
+/.claude/
+/spikes/results/jobs/
+
+# Third-party checkout and build output from the Phase 0 spikes
+/spikes/s5/hermes-agent/
+/spikes/s2/out/
+/spikes/s7/out/
+
+# Binaries
+/noskill
+/noskill-tray
+*.exe

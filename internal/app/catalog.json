@@ -1,0 +1,11 @@
+[
+  {"name": "qwen3:4b", "tasks": ["chat", "research", "reasoning", "math", "plan", "translate", "creative", "summarise", "extract"], "needs": ["tools", "thinking"], "mem_gb": 3.9, "note": "Default on 16 GB: native tool calling and optional thinking. Measured at 8k context."},
+  {"name": "qwen3:8b", "tasks": ["chat", "research", "reasoning", "math", "plan", "translate", "creative", "summarise", "extract"], "needs": ["tools", "thinking"], "mem_gb": 6.6, "note": "Better answers than the 4B; needs a larger memory budget than the 8 GB default on 16 GB machines. Measured at 8k context."},
+  {"name": "qwen2.5-coder:7b", "tasks": ["code"], "needs": ["tools"], "mem_gb": 5.1, "note": "The default code model; fits the 8 GB budget next to the decision model. Measured at 8k context."},
+  {"name": "qwen2.5vl:7b", "tasks": ["vision"], "needs": ["vision", "tools"], "mem_gb": 7.3, "note": "Reads images and screenshots. Too big to sit next to the decision model on 16 GB, so noskill unloads that while it runs. Measured at 8k context."},
+  {"name": "llama3.2:3b", "tasks": ["chat", "summarise", "extract"], "needs": ["tools"], "mem_gb": 2.8, "note": "Small and fast; calls tools often when it shouldn't. Estimated size."},
+  {"name": "gemma3:4b", "tasks": ["chat", "summarise", "vision"], "needs": ["vision"], "mem_gb": 3.8, "note": "Small model that also reads images. Estimated size."},
+  {"name": "tev1:0.8b", "tasks": [], "needs": ["decide"], "mem_gb": 1.7, "note": "Decision model for routing and judging; 1.7 GB, up to 2.7 GB with its prompt cache. Default on 16 GB."},
+  {"name": "tev1", "tasks": [], "needs": ["decide"], "mem_gb": 4.0, "note": "Larger decision model for machines above 16 GB; its prompt cache can grow to about 13 GB. Estimated base size."},
+  {"name": "nomic-embed-text", "tasks": [], "needs": ["embed"], "mem_gb": 0.3, "note": "Embedding model for skill selection and local search. Estimated size."}
+]

@@ -1,0 +1,99 @@
+# GoReleaser config (docs/PACKAGING.md). `goreleaser release --snapshot --clean` builds everything
+# locally without publishing or signing. The GitHub org isn't chosen yet (AGENTS.md): the owner and
+# repository come from the environment (GITHUB_REPOSITORY_OWNER / GITHUB_REPOSITORY) when released.
+version: 2
+project_name: noskill
+
+before:
+  hooks:
+    - go mod tidy
+    - go vet ./...
+
+builds:
+  - id: noskill
+    main: ./cmd/noskill
+    binary: noskill
+    env: [CGO_ENABLED=0]            # static; the tray app is the only CGO binary (ADR-0004)
+    goos: [linux, windows, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w
+      - -X main.Version={{ .Version }}
+      - -X noskill/internal/update.PublicKey={{ .Env.NOSKILL_UPDATE_PUBKEY }}
+
+universal_binaries:
+  - ids: [noskill]
+    replace: true                     # one macOS binary for Apple Silicon and Intel
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "noskill_{{ .Version }}_{{ .Os }}_{{ if eq .Arch \"all\" }}universal{{ else }}{{ .Arch }}{{ end }}"
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+sboms:
+  - artifacts: archive                # SPDX per archive (syft must be installed in the release job)
+
+# cosign keyless signature of checksums.txt (Sigstore). The ed25519 release signature that
+# `noskill update` checks offline is made by scripts/sign-checksums.sh in release.yml.
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    args: ["sign-blob", "--yes", "--bundle=${signature}", "${artifact}"]
+    signature: "${artifact}.sigstore.json"
+
+nfpms:
+  - id: packages
+    package_name: noskill
+    formats: [deb, rpm]
+    maintainer: noskill maintainers
+    description: Local models with skills that learn.
+    license: MIT
+    homepage: "https://github.com/{{ .Env.GITHUB_REPOSITORY }}"
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/noskill/LICENSE
+
+brews:
+  - name: noskill
+    repository:
+      owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+      name: homebrew-tap
+    homepage: "https://github.com/{{ .Env.GITHUB_REPOSITORY }}"
+    description: Local models with skills that learn.
+    license: MIT
+    skip_upload: auto                 # prereleases and snapshots don't touch the tap
+    test: |
+      system "#{bin}/noskill", "version"
+
+scoops:
+  - name: noskill
+    repository:
+      owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+      name: scoop-bucket
+    homepage: "https://github.com/{{ .Env.GITHUB_REPOSITORY }}"
+    description: Local models with skills that learn.
+    license: MIT
+    skip_upload: auto
+
+release:
+  github:
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+    name: noskill
+  prerelease: auto
+  draft: true                         # a person publishes after the signing checks
+
+changelog:
+  use: github
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]

@@ -1,0 +1,10 @@
+# Your own qBittorrent feed titles stay on this machine (PHASE0_TESTS.md, rss-100)
+data/rss-100.jsonl
+# Raw per-call results; summaries go to docs/spikes/
+results/
+__pycache__/
+s2/out/
+s5/hermes-agent/
+s5/out/
+s9/out/
+s7/out/

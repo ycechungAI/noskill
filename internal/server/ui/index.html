@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>noskill</title>
+<style>
+:root{--bg:#f6f6f4;--card:#fff;--ink:#1b1c1e;--mute:#6a6e75;--line:#e3e3df;--ok:#1f7a4d;--warn:#a96a00;--bad:#b3261e;--acc:#2f5fd0;--chip:#efefeb}
+@media (prefers-color-scheme:dark){:root{--bg:#141517;--card:#1c1e21;--ink:#e8e9ea;--mute:#9a9ea5;--line:#2c2f33;--ok:#58c58a;--warn:#e0a13a;--bad:#f2766e;--acc:#7ea2ff;--chip:#26292d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;padding:16px 16px 4px;max-width:1100px;margin:0 auto}
+h1{font-size:18px;margin:0;font-weight:650}
+#sub{color:var(--mute)}
+main{max-width:1100px;margin:0 auto;padding:8px 16px 40px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr))}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+section.wide{grid-column:1/-1}
+h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 8px;font-weight:600}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;color:var(--mute);font-weight:500;font-size:12px}
+td,th{padding:4px 8px 4px 0;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.scroll{overflow-x:auto}
+.chip{display:inline-block;padding:0 7px;border-radius:99px;background:var(--chip);font-size:12px;white-space:nowrap}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mute{color:var(--mute)}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:2px 9px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.go{background:var(--acc);border-color:var(--acc);color:#fff}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.empty{color:var(--mute)}
+#login{display:none;max-width:420px;margin:60px auto;padding:16px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+#login input{width:100%;font:inherit;padding:6px 8px;margin:8px 0;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.q{display:inline-block;height:6px;width:60px;background:var(--chip);border-radius:3px;vertical-align:middle;margin-right:6px;overflow:hidden}
+.q i{display:block;height:100%;background:var(--acc)}
+code{font:12px ui-monospace,Menlo,Consolas,monospace}
+.appr{padding:6px 0;border-bottom:1px solid var(--line)}.appr:last-child{border-bottom:0}
+.appr:target{outline:2px solid var(--acc);outline-offset:4px;border-radius:4px}
+.fields{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;align-items:center;margin:6px 0 2px}
+.fields input{font:inherit;padding:3px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:100%}
+.fields input:invalid{border-color:var(--bad)}
+</style>
+</head>
+<body>
+<div id="login">
+  <b>noskill needs a token</b>
+  <p class="mute">This server has tokens set in <code>[[server.tokens]]</code>. Use one with <code>admin = true</code>. It stays in this tab only.</p>
+  <input id="tok" type="password" placeholder="token" autocomplete="off">
+  <button class="go" id="tokgo">Continue</button>
+  <div id="loginerr" class="bad"></div>
+</div>
+<div id="app" hidden>
+<header><h1>noskill</h1><span id="sub"></span><span style="flex:1"></span><span class="row"><button id="pauseall"></button></span></header>
+<main>
+  <section class="wide" id="s-approvals"><h2>Waiting for you</h2><div id="approvals"></div></section>
+  <section id="s-jobs"><h2>Jobs</h2><div class="scroll" id="jobs"></div></section>
+  <section id="s-runs"><h2>Recent runs</h2><div class="scroll" id="runs"></div></section>
+  <section class="wide" id="s-models"><h2>Models</h2><div class="scroll" id="models"></div></section>
+  <section id="s-skills"><h2>Skills</h2><div class="scroll" id="skills"></div></section>
+  <section id="s-learning"><h2>Learning</h2><div class="scroll" id="learning"></div><h2 style="margin-top:14px">Evaluation</h2><div class="scroll" id="eval"></div></section>
+</main>
+</div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const tokenKey = "noskill.token";
+let token = "";
+try { token = sessionStorage.getItem(tokenKey) || ""; } catch (e) {}
+let paused = false;
+let shown = false;
+const edits = {}, errors = {}; // approval id → field name → what the user typed (kept across refreshes)
+
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const k in (attrs || {})) {
+    if (k === "class") e.className = attrs[k];
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return e;
+}
+function put(id, ...kids) { const n = $(id); n.replaceChildren(...kids.flat()); }
+function empty(t) { return el("div", {class: "empty"}, t); }
+function chip(t, cls) { return el("span", {class: "chip " + (cls || "")}, t); }
+function table(head, rows) {
+  if (!rows.length) return null;
+  return el("table", {}, el("tr", {}, head.map(h => el("th", {}, h))), rows.map(r => el("tr", {}, r.map(c => el("td", {}, c)))));
+}
+function ago(t) {
+  if (!t || t.startsWith("0001")) return "";
+  const s = (Date.now() - new Date(t)) / 1000;
+  if (s < 0) { const f = -s; return f < 90 ? "in " + Math.round(f) + " s" : f < 5400 ? "in " + Math.round(f / 60) + " min" : f < 129600 ? "in " + Math.round(f / 3600) + " h" : "in " + Math.round(f / 86400) + " d"; }
+  if (s < 90) return Math.round(s) + " s ago";
+  if (s < 5400) return Math.round(s / 60) + " min ago";
+  if (s < 129600) return Math.round(s / 3600) + " h ago";
+  return Math.round(s / 86400) + " d ago";
+}
+async function api(path, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({}, opts.headers || {});
+  if (token) opts.headers["Authorization"] = "Bearer " + token;
+  return fetch(path, opts);
+}
+// act posts an action. A failure goes to onErr when given (shown next to the item), else an alert.
+async function act(path, body, onErr) {
+  const r = await api(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})});
+  if (!r.ok) { let m = r.status + ""; try { m = (await r.json()).error.message || m; } catch (e) {} if (onErr) { onErr(m); return false; } alert(m); }
+  refresh();
+  return r.ok;
+}
+
+// approval draws one item. Editable fields (FR-A6) start at their prefilled value; folders get the
+// attached drives as suggestions. Approve sends only the fields the user changed.
+function approval(a, vols) {
+  const ed = edits[a.id] = edits[a.id] || {};
+  const fields = (a.fields || []).map(f => {
+    const list = "dl-" + a.id + "-" + f.name;
+    const sugg = f.type === "folder" ? [f.prefill].concat(vols.filter(v => v.external).map(v => v.mount)).filter(Boolean) : [];
+    const attrs = {value: f.name in ed ? ed[f.name] : (f.prefill || ""), "aria-label": f.label || f.name,
+      type: f.type === "number" ? "number" : "text", oninput: e => { ed[f.name] = e.target.value; delete errors[a.id]; const n = e.target.closest(".appr").querySelector("[role=alert]"); if (n) n.textContent = ""; }};
+    if (sugg.length) attrs.list = list;
+    if (f.type === "folder") attrs.spellcheck = "false";
+    return [el("label", {class: "mute"}, f.label || f.name),
+      el("span", {}, el("input", attrs), sugg.length ? el("datalist", {id: list}, [...new Set(sugg)].map(p => el("option", {value: p}))) : null)];
+  });
+  const errs = el("div", {class: "bad", role: "alert"}, errors[a.id] || "");
+  const fail = m => { errors[a.id] = errs.textContent = m; };
+  const changed = () => { const o = {}; for (const f of a.fields || []) if (f.name in ed && ed[f.name] !== (f.prefill || "")) o[f.name] = ed[f.name]; return o; };
+  return el("div", {class: "appr", id: "a-" + a.id},
+    el("div", {class: "row"}, chip(a.kind), el("span", {}, a.summary), el("span", {class: "mute"}, "expires " + ago(a.expires_at)),
+      el("span", {style: "flex:1"}),
+      el("button", {class: "go", onclick: async () => { if (await act("/noskill/v1/approvals/" + a.id, {action: "approve", fields: changed()}, fail)) { delete edits[a.id]; delete errors[a.id]; } }}, "Approve"),
+      el("button", {onclick: async () => { if (await act("/noskill/v1/approvals/" + a.id, {action: "skip"}, fail)) { delete edits[a.id]; delete errors[a.id]; } }}, "Skip")),
+    fields.length ? el("div", {class: "fields"}, fields.flat()) : null, errs);
+}
+
+function render(d) {
+  const s = d.status;
+  for (const k of ["models", "backends", "jobs", "approvals", "runs", "skills", "learning", "eval"]) s[k] = s[k] || [];
+  paused = s.jobs_paused;
+  $("sub").textContent = "v" + d.version + " · " + (s.primary ? s.primary + " loaded" : "no model loaded") + " · sandbox: " + (s.sandbox || "none");
+  const pa = $("pauseall");
+  pa.textContent = paused ? "Resume all jobs" : "Pause all jobs";
+  pa.onclick = () => act("/noskill/v1/jobs/all/" + (paused ? "resume" : "pause"));
+
+  // Don't redraw approvals while the user is typing in one of their fields.
+  const typing = document.activeElement && document.activeElement.tagName === "INPUT" && $("approvals").contains(document.activeElement);
+  if (!typing) put("approvals", s.approvals.length ? s.approvals.map(a => approval(a, s.volumes || [])) : empty("Nothing is waiting."));
+
+  put("jobs", table(["Job", "Schedule", "Next", "Last", ""], s.jobs.map(j => [
+    j.name, el("code", {}, j.schedule),
+    j.enabled ? ago(j.next) : chip("paused", "warn"),
+    j.running ? chip("running", "ok") : (j.last ? el("span", {class: j.last === "done" || j.last === "ok" ? "ok" : (j.last === "failed" ? "bad" : "")}, j.last + " " + ago(j.last_at)) : ""),
+    el("span", {class: "row"},
+      el("button", {onclick: () => act("/noskill/v1/jobs/" + j.id + "/run")}, "Run now"),
+      el("button", {onclick: () => act("/noskill/v1/jobs/" + j.id + "/" + (j.enabled ? "pause" : "resume"))}, j.enabled ? "Pause" : "Resume"))])) || empty("No jobs. Add one with noskill schedule add."));
+
+  put("runs", table(["When", "Model", "Task", "Result", "Time"], s.runs.map(r => [
+    ago(r.at), r.model || "", r.task_type || r.source,
+    el("span", {class: r.outcome === "success" ? "ok" : r.outcome === "fail" ? "bad" : (r.status === "done" ? "" : "warn")}, r.outcome || r.status),
+    (r.ms / 1000).toFixed(1) + " s · " + r.tokens + " tok"])) || empty("No runs yet."));
+
+  put("models", table(["Model", "Size", "Speed", "Cold load", "Quality by task type", ""], s.models.map(m => [
+    m.name, m.size_gb.toFixed(1) + " GB",
+    m.tok_s ? m.tok_s.toFixed(0) + " tok/s" : el("span", {class: "mute"}, "not benched"),
+    m.load_s ? m.load_s.toFixed(1) + " s" : "",
+    m.quality ? el("span", {class: "row"}, Object.keys(m.quality).sort().map(k => el("span", {title: k + " " + m.quality[k].toFixed(2)},
+      el("span", {class: "q"}, el("i", {style: "width:" + Math.round(m.quality[k] * 100) + "%"})), k))) : "",
+    m.loaded ? chip("loaded", "ok") : ""])) || empty("No models found. Is Ollama running?"));
+  const bad = s.backends.filter(b => !b.ok);
+  if (bad.length) $("models").prepend(el("div", {class: "bad"}, bad.map(b => b.id + ": " + b.error)));
+
+  put("skills", table(["Skill", "Origin", "Status", "Used", "Success"], s.skills.map(k => [
+    el("span", {}, k.name, k.review ? el("div", {class: "warn"}, k.review) : null),
+    k.origin, k.status === "active" ? "active" : chip(k.status, "warn"),
+    k.uses || "", k.rated ? Math.round(100 * k.success / k.rated) + "% of " + k.rated : ""])) || empty("No skills."));
+
+  put("learning", table(["Kind", "Why", "Status", "Result"], s.learning.map(l => [
+    l.kind, l.reason || "", l.status, el("span", {class: l.status === "failed" ? "bad" : "mute"}, l.result || l.last_error || "")])) || empty("Nothing queued."));
+  put("eval", table(["When", "Model", "Suite", "Passed"], s.eval.map(e => [
+    ago(e.started_at), e.model, e.suite, e.passed + "/" + e.tasks])) || empty("No eval runs. Try noskill eval run."));
+}
+
+let timer = 0;
+async function refresh() {
+  clearTimeout(timer);
+  try {
+    const r = await api("/noskill/v1/status");
+    if (r.status === 401) { $("app").hidden = true; $("login").style.display = "block"; return; }
+    if (r.status === 403) { $("app").hidden = false; $("login").style.display = "none"; put("approvals", el("div", {class: "bad"}, "This token isn't an admin token. Add admin = true to it in [[server.tokens]].")); return; }
+    $("login").style.display = "none"; $("app").hidden = false;
+    render(await r.json());
+    if (!shown && location.hash.startsWith("#a-")) { // opened from the tray's "Change…" item
+      const n = document.getElementById(location.hash.slice(1));
+      if (n) { n.scrollIntoView({block: "center"}); const i = n.querySelector("input"); if (i) i.focus(); }
+    }
+    shown = true;
+  } catch (e) {
+    $("sub").textContent = "can't reach noskill: " + e.message;
+  }
+  timer = setTimeout(refresh, 4000);
+}
+$("tokgo").onclick = () => {
+  token = $("tok").value.trim();
+  try { sessionStorage.setItem(tokenKey, token); } catch (e) {}
+  refresh();
+};
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+refresh();
+</script>
+</body>
+</html>

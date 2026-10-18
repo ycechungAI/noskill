@@ -1,0 +1,127 @@
+{
+  "now_utc": "2026-10-15T08:30:00+00:00",
+  "local_tz": "Europe/London",
+  "home": "/Users/me",
+  "files": [
+    "~/Downloads/invoice-0412.pdf",
+    "~/Downloads/report-q3.pdf",
+    "~/Downloads/IMG_2041.jpg",
+    "~/Downloads/IMG_2042.jpg",
+    "~/Downloads/holiday.png",
+    "~/Downloads/setup-ollama.dmg",
+    "~/Downloads/notes.txt",
+    "~/Downloads/[SubsPlease] Frieren - 03 (1080p).mkv",
+    "~/Documents/budget-2026.xlsx",
+    "~/Documents/PDFs/tax-2025.pdf",
+    "~/Documents/Notes/ideas.md",
+    "~/Pictures/Screenshots/shot-001.png",
+    "~/Desktop/todo.md",
+    "~/Desktop/screenshot-1.png",
+    "~/Projects/noskill/README.md",
+    "~/Projects/noskill/go.mod",
+    "/Volumes/AnimeDrive/Anime/Frieren/Frieren - 01.mkv",
+    "/Volumes/AnimeDrive/Anime/Frieren/Frieren - 02.mkv",
+    "/Volumes/AnimeDrive/Anime/Dandadan/Dandadan - 01.mkv"
+  ],
+  "tools": [
+    {
+      "name": "search",
+      "description": "Search the web. Returns a list of results with title, url and snippet.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "fetch",
+      "description": "Download a web page or file by URL and return its text.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Full URL starting with http(s)://"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "list_dir",
+      "description": "List the files and folders in a folder on this computer. Folders end with '/'.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Folder path, e.g. ~/Downloads or /Volumes/<drive>"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "move",
+      "description": "Move or rename a file. If dst is an existing folder the file keeps its name. Never overwrites.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string",
+            "description": "Current file path"
+          },
+          "dst": {
+            "type": "string",
+            "description": "New file path or destination folder"
+          }
+        },
+        "required": [
+          "src",
+          "dst"
+        ]
+      }
+    },
+    {
+      "name": "run_python",
+      "description": "Run a short Python 3 program (standard library only, no network, no file access) and return what it prints. Use print() for the result.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Python source code"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    },
+    {
+      "name": "get_time",
+      "description": "Get the current date, time and weekday. Without a timezone it returns the user's local time.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "Optional IANA timezone, e.g. Asia/Tokyo"
+          }
+        },
+        "required": []
+      }
+    }
+  ]
+}

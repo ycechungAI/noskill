@@ -1,0 +1,11 @@
+; S5: run third-party install code with a throwaway HOME. Writes only under spikes/s5/out and temp dirs;
+; reads nothing under /Users/neolinux except spikes/s5. Network is open (the installer downloads).
+(version 1)
+(allow default)
+(deny file-write*)
+(allow file-write*
+  (subpath "/Users/neolinux/dev/noskill/spikes/s5/out")
+  (subpath "/private/tmp") (subpath "/private/var/folders") (subpath "/dev"))
+(deny file-read* (subpath "/Users/neolinux"))
+(allow file-read-metadata) ; stat only, so path walks (mkdir -p, realpath) work
+(allow file-read* (subpath "/Users/neolinux/dev/noskill/spikes/s5"))

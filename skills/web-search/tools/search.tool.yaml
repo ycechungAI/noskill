@@ -1,0 +1,6 @@
+name: search
+description: Search the web. Returns title, url and snippet for each result.
+runtime: builtin
+entry: web.search
+timeout: 30s
+max_output: 8kb

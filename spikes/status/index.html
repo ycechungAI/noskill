@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spike status</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e3df;
+    --track: #ecebe7; --fill: #2f6fdb; --ok: #2e8b57; --warn: #c27c0e; --stop: #b3402f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --card: #1f1f1d; --text: #ecebe7; --muted: #9a9993; --line: #2e2e2b;
+      --track: #2c2c29; --fill: #5b8ff0; --ok: #4fb37a; --warn: #e0a23a; --stop: #e06a57;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  h1 { font-size: 18px; margin: 0; }
+  .muted { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  h2 { font-size: 15px; margin: 0; }
+  .pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+  .running { color: var(--fill); } .done { color: var(--ok); } .stopped { color: var(--stop); } .waiting { color: var(--muted); }
+  .bar { height: 12px; background: var(--track); border-radius: 99px; overflow: hidden; margin: 10px 0 6px; }
+  .bar.small { height: 6px; margin: 4px 0 0; }
+  .bar > div { height: 100%; background: var(--fill); border-radius: 99px; transition: width .6s ease; }
+  .done .bar > div, .bar.complete > div { background: var(--ok); }
+  .stats { display: flex; gap: 16px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+  .stats b { font-weight: 600; }
+  .now { margin-top: 6px; font-size: 13px; }
+  code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); word-break: break-all; }
+  .groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; margin-top: 12px; }
+  .g { font-size: 12px; font-variant-numeric: tabular-nums; }
+  .g .row { gap: 4px; }
+  .overall .bar { height: 16px; }
+  #err { color: var(--stop); display: none; }
+  .note, .tbl, .log { color: var(--text); }
+  .note { margin: 8px 0 0; font-size: 13px; }
+  .note:first-of-type { color: var(--muted); }
+  .tbl, .log { margin-top: 12px; overflow-x: auto; }
+  .tt { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  table { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+  td { padding: 3px 12px 3px 0; border-top: 1px solid var(--line); white-space: nowrap; }
+  td.m { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Phase 0 spikes</h1>
+    <span class="muted">Updated <span id="time">–</span> · every 2 s</span>
+  </header>
+  <p id="err">Can't reach the status server. Is it still running?</p>
+  <div class="card overall">
+    <div class="row"><h2>All experiment runs</h2><span id="ov-pct" class="muted"></span></div>
+    <div class="bar"><div id="ov-bar" style="width:0"></div></div>
+    <div class="muted" id="ov-txt"></div>
+  </div>
+  <div id="exps"></div>
+  <div class="card">
+    <h2>Machine</h2>
+    <div class="stats" style="margin-top:6px">
+      <span>Free memory <b id="mem">–</b></span>
+      <span>Loaded in Ollama <b id="loaded">–</b></span>
+    </div>
+  </div>
+</main>
+<script>
+const pct = (d, t) => t ? Math.floor(100 * d / t) : 0;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function cls(state) {
+  if (state.startsWith("running")) return "running";
+  if (state === "done") return "done";
+  if (state === "stopped") return "stopped";
+  return "waiting";
+}
+function render(s) {
+  document.getElementById("time").textContent = s.time;
+  const o = s.overall;
+  document.getElementById("ov-bar").style.width = pct(o.done, o.total) + "%";
+  document.getElementById("ov-pct").textContent = pct(o.done, o.total) + "%";
+  document.getElementById("ov-txt").textContent = `${o.done} of ${o.total} runs`;
+  document.getElementById("exps").innerHTML = s.experiments.map(e => {
+    const c = cls(e.state);
+    const stats = [
+      `<span><b>${e.done}</b> / ${e.total}</span>`,
+      `<span><b>${pct(e.done, e.total)}%</b></span>`,
+      e.eta ? `<span>About <b>${e.eta}</b> left (rough)</span>` : "",
+      e.elapsed ? `<span>Running for <b>${esc(e.elapsed)}</b></span>` : "",
+      e.errors ? `<span style="color:var(--stop)">${e.errors} errored (retried on resume)</span>` : "",
+    ].join("");
+    const groups = e.groups.length ? `<div class="groups">${e.groups.map(g => `
+      <div class="g"><div class="row"><span>${esc(g.label)}</span>
+        <span class="muted">${g.done}/${g.total}${g.success === null ? "" : ` · ${g.success}% ok`}</span></div>
+        <div class="bar small ${g.done >= g.total ? "complete" : ""}"><div style="width:${pct(g.done, g.total)}%"></div></div></div>`).join("")}</div>` : "";
+    return `<div class="card ${c}">
+      <div class="row"><h2>${esc(e.name)}</h2><span class="pill ${c}">${esc(e.state)}</span></div>
+      <div class="bar"><div style="width:${pct(e.done, e.total)}%"></div></div>
+      <div class="stats">${stats}</div>
+      ${e.now ? `<div class="now">Last finished: ${esc(e.now)}</div>` : ""}
+      ${e.last_line ? `<div class="now"><code>${esc(e.last_line)}</code></div>` : ""}
+      ${(e.notes || []).map(n => `<p class="note">${esc(n)}</p>`).join("")}
+      ${(e.tables || []).map(t => `<div class="tbl"><div class="tt">${esc(t.title)}</div><table>${t.rows.map(r =>
+        `<tr>${r.map((v, i) => `<td${i ? "" : ' class="m"'}>${esc(i === 1 ? v + " done" : v)}</td>`).join("")}</tr>`).join("")}</table></div>`).join("")}
+      ${(e.log || []).length ? `<div class="log"><div class="tt">Last lines from the S3 console</div>${e.log.map(l => `<code>${esc(l)}</code>`).join("<br>")}</div>` : ""}
+      ${groups}</div>`;
+  }).join("");
+  const m = s.machine;
+  document.getElementById("mem").textContent = m.free_pct == null ? "–" : m.free_pct + "%";
+  document.getElementById("loaded").textContent = m.loaded == null ? "Ollama not reachable"
+    : m.loaded.length ? m.loaded.map(x => `${x.name} (${x.gb} GB, ctx ${x.ctx})`).join(", ") : "nothing";
+}
+async function tick() {
+  try {
+    const r = await fetch("/status.json", {cache: "no-store"});
+    render(await r.json());
+    document.getElementById("err").style.display = "none";
+  } catch (e) {
+    document.getElementById("err").style.display = "block";
+  }
+}
+tick();
+setInterval(tick, 2000);
+</script>
+</body>
+</html>

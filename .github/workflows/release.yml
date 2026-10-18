@@ -1,0 +1,58 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+# Signing keys and the Apple/Windows credentials live in the `release` environment, which needs a
+# reviewer's approval to run (docs/PACKAGING.md "CI pipelines"). Steps that need a secret that isn't
+# configured are skipped and say so; the release then stays a draft.
+permissions:
+  contents: write
+  id-token: write       # cosign keyless signing and build attestations
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      NOSKILL_UPDATE_PUBKEY: ${{ vars.NOSKILL_UPDATE_PUBKEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Reachable vulnerabilities block the release
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
+      - run: go test -count=1 ./...
+      - uses: sigstore/cosign-installer@v3
+      - uses: anchore/sbom-action/download-syft@v0
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sign checksums.txt with the release key (what `noskill update` checks offline)
+        if: env.NOSKILL_RELEASE_KEY != ''
+        env:
+          NOSKILL_RELEASE_KEY: ${{ secrets.NOSKILL_RELEASE_KEY }}
+        run: scripts/sign-checksums.sh dist/checksums.txt
+      - name: Upload the release-key signature
+        if: env.NOSKILL_RELEASE_KEY != ''
+        env:
+          NOSKILL_RELEASE_KEY: ${{ secrets.NOSKILL_RELEASE_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/checksums.txt.ed25519 --clobber
+      - name: Build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: dist/*.tar.gz
+      - name: macOS signing and notarisation
+        run: |
+          echo "Apple Developer enrolment isn't done yet (ROADMAP Phase 0); the macOS binary is unsigned." >> "$GITHUB_STEP_SUMMARY"
+      - name: Windows signing
+        run: |
+          echo "Windows signing (SignPath Foundation) isn't set up yet; the Windows binary is unsigned." >> "$GITHUB_STEP_SUMMARY"

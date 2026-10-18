@@ -1,0 +1,165 @@
+# Training requests for `noskill eval simulate`: what a user of each family asks day to day. The
+# held-out tasks in ../tasks/multi.yaml have the same families with other names and contents.
+# Same format as eval tasks; the check stands in for the user's good/bad rating.
+- id: w-sort-1
+  family: sort-by-type
+  skills: [files]
+  writes: true
+  prompt: "Tidy up {dir}: put every .txt file into a folder named notes and every .csv file into a folder named sheets."
+  files: { todo.txt: t, call.txt: c, budget.csv: "x,y", scores.csv: "1,2", logo.svg: l }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [notes/todo.txt, notes/call.txt, sheets/budget.csv, sheets/scores.csv, logo.svg], absent: [todo.txt, budget.csv] }
+- id: w-sort-2
+  family: sort-by-type
+  skills: [files]
+  writes: true
+  prompt: "Tidy up {dir}: put every .pdf file into a folder named papers and every .png file into a folder named images."
+  files: { thesis.pdf: t, invoice.pdf: i, chart.png: c, icon.png: o, song.mp3: s }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [papers/thesis.pdf, papers/invoice.pdf, images/chart.png, images/icon.png, song.mp3], absent: [thesis.pdf, icon.png] }
+- id: w-sort-3
+  family: sort-by-type
+  skills: [files]
+  writes: true
+  prompt: "Tidy up {dir}: put every .log file into a folder named logs and every .txt file into a folder named text."
+  files: { a.log: a, b.log: b, c.log: c, read.txt: r, data.bin: d }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [logs/a.log, logs/b.log, logs/c.log, text/read.txt, data.bin], absent: [a.log, read.txt] }
+- id: w-log-1
+  family: log-errors
+  skills: [files]
+  writes: true
+  prompt: "Read {dir}/app.log, write every line that contains ERROR to {dir}/errors.txt, and tell me how many there were. End with just the number."
+  files: { app.log: "INFO boot\nERROR no config\nINFO ready\nERROR port in use\n" }
+  tools: [write_text]
+  check: { number: 2 }
+  end: { file_has: { errors.txt: port in use }, file_lacks: { errors.txt: ready } }
+- id: w-log-2
+  family: log-errors
+  skills: [files]
+  writes: true
+  prompt: "Read {dir}/backup.log, write every line that contains ERROR to {dir}/errors.txt, and tell me how many there were. End with just the number."
+  files: { backup.log: "ERROR disk 2 missing\nINFO copied 40 files\nERROR checksum mismatch\nERROR retry failed\nINFO done\n" }
+  tools: [write_text]
+  check: { number: 3 }
+  end: { file_has: { errors.txt: checksum mismatch }, file_lacks: { errors.txt: copied 40 } }
+- id: w-log-3
+  family: log-errors
+  skills: [files]
+  writes: true
+  prompt: "Read {dir}/sync.log, write every line that contains ERROR to {dir}/errors.txt, and tell me how many there were. End with just the number."
+  files: { sync.log: "INFO 1\nINFO 2\nERROR conflict in notes.md\nINFO 3\n" }
+  tools: [write_text]
+  check: { number: 1 }
+  end: { file_has: { errors.txt: conflict in notes.md }, file_lacks: { errors.txt: INFO } }
+- id: w-arch-1
+  family: archive-prefix
+  skills: [files]
+  writes: true
+  prompt: "Make a folder {dir}/archive and move every file whose name starts with 2021- into it."
+  files: { 2021-jan.txt: a, 2021-feb.txt: b, 2024-jan.txt: c, plan.txt: d }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [archive/2021-jan.txt, archive/2021-feb.txt, 2024-jan.txt, plan.txt], absent: [2021-jan.txt, 2021-feb.txt] }
+- id: w-arch-2
+  family: archive-prefix
+  skills: [files]
+  writes: true
+  prompt: "Make a folder {dir}/past and move every file whose name starts with draft- into it."
+  files: { draft-1.md: a, draft-2.md: b, draft-3.md: c, final.md: d }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [past/draft-1.md, past/draft-2.md, past/draft-3.md, final.md], absent: [draft-1.md, draft-3.md] }
+- id: w-arch-3
+  family: archive-prefix
+  skills: [files]
+  writes: true
+  prompt: "Make a folder {dir}/sent and move every file whose name starts with invoice- into it."
+  files: { invoice-7.pdf: a, invoice-8.pdf: b, quote-9.pdf: c }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [sent/invoice-7.pdf, sent/invoice-8.pdf, quote-9.pdf], absent: [invoice-7.pdf, invoice-8.pdf] }
+- id: w-ren-1
+  family: rename-prefix
+  skills: [files]
+  writes: true
+  prompt: "Rename every .jpg file in {dir} by adding the prefix paris- to its name (so a.jpg becomes paris-a.jpg). Leave other files alone."
+  files: { tower.jpg: t, cafe.jpg: c, ticket.pdf: k }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [paris-tower.jpg, paris-cafe.jpg, ticket.pdf], absent: [tower.jpg, cafe.jpg, paris-ticket.pdf] }
+- id: w-ren-2
+  family: rename-prefix
+  skills: [files]
+  writes: true
+  prompt: "Rename every .mp3 file in {dir} by adding the prefix live- to its name (so a.mp3 becomes live-a.mp3). Leave other files alone."
+  files: { one.mp3: o, two.mp3: t, cover.png: c }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [live-one.mp3, live-two.mp3, cover.png], absent: [one.mp3, two.mp3, live-cover.png] }
+- id: w-ren-3
+  family: rename-prefix
+  skills: [files]
+  writes: true
+  prompt: "Rename every .png file in {dir} by adding the prefix ui- to its name (so a.png becomes ui-a.png). Leave other files alone."
+  files: { button.png: b, menu.png: m, header.png: h, notes.txt: n }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [ui-button.png, ui-menu.png, ui-header.png, notes.txt], absent: [button.png, header.png, ui-notes.txt] }
+- id: w-bak-1
+  family: backup-copy
+  skills: [files]
+  writes: true
+  prompt: "Copy every .txt file in {dir} into a folder {dir}/backup, keeping the originals where they are."
+  files: { list.txt: "milk eggs", poem.txt: "roses are red", song.mp3: s }
+  tools: [copy_verify]
+  check: { answered: true }
+  end: { exists: [list.txt, poem.txt, song.mp3], absent: [backup/song.mp3], file_has: { backup/list.txt: milk eggs, backup/poem.txt: roses are red } }
+- id: w-bak-2
+  family: backup-copy
+  skills: [files]
+  writes: true
+  prompt: "Copy every .csv file in {dir} into a folder {dir}/backup, keeping the originals where they are."
+  files: { q1.csv: "1,2", q2.csv: "3,4", q3.csv: "5,6", chart.png: c }
+  tools: [copy_verify]
+  check: { answered: true }
+  end: { exists: [q1.csv, q2.csv, q3.csv], absent: [backup/chart.png], file_has: { backup/q1.csv: "1,2", backup/q3.csv: "5,6" } }
+- id: w-bak-3
+  family: backup-copy
+  skills: [files]
+  writes: true
+  prompt: "Copy every .json file in {dir} into a folder {dir}/backup, keeping the originals where they are."
+  files: { users.json: '{"n":1}', roles.json: '{"r":2}', app.log: l }
+  tools: [copy_verify]
+  check: { answered: true }
+  end: { exists: [users.json, roles.json], absent: [backup/app.log], file_has: { backup/users.json: '"n":1', backup/roles.json: '"r":2' } }
+- id: w-cat-1
+  family: combine-text
+  skills: [files]
+  writes: true
+  prompt: "Read every .txt file in {dir} and write a new file {dir}/all.txt that contains all of their lines."
+  files: { x.txt: "xray note", y.txt: "yankee note", z.txt: "zulu note" }
+  tools: [write_text]
+  check: { answered: true }
+  end: { file_has: { all.txt: yankee note } }
+- id: w-cat-2
+  family: combine-text
+  skills: [files]
+  writes: true
+  prompt: "Read every .txt file in {dir} and write a new file {dir}/all.txt that contains all of their lines."
+  files: { jan.txt: "paid rent", feb.txt: "paid rent and gas", mar.txt: "bought a bike" }
+  tools: [write_text]
+  check: { answered: true }
+  end: { file_has: { all.txt: bought a bike } }
+- id: w-cat-3
+  family: combine-text
+  skills: [files]
+  writes: true
+  prompt: "Read every .txt file in {dir} and write a new file {dir}/all.txt that contains all of their lines."
+  files: { p1.txt: "first page", p2.txt: "second page" }
+  tools: [write_text]
+  check: { answered: true }
+  end: { file_has: { all.txt: second page } }

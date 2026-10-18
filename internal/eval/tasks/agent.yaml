@@ -1,0 +1,88 @@
+# Agent tasks: the whole loop with real tools against a temporary folder ({dir}). Nothing here
+# touches the OS trash or the network.
+- id: files-01
+  type: files
+  skills: [files]
+  prompt: "Read {dir}/notes.txt and tell me which day the meeting moved to."
+  files: { notes.txt: "Meeting moved to Friday 10am." }
+  tools: [read_text]
+  check: { contains: [friday] }
+- id: files-02
+  type: files
+  skills: [files]
+  prompt: "How many files are in {dir}? Just the number."
+  files: { a.txt: one, b.txt: two, c.txt: three }
+  tools: [list_dir]
+  check: { number: 3 }
+- id: files-03
+  type: files
+  skills: [files]
+  writes: true
+  prompt: "Create a file {dir}/hello.txt containing exactly the text: Hello noskill"
+  tools: [write_text]
+  check: { answered: true }
+  end: { file_has: { hello.txt: Hello noskill } }
+- id: files-04
+  type: files
+  skills: [files]
+  writes: true
+  prompt: "Move {dir}/draft.txt to {dir}/final.txt."
+  files: { draft.txt: some text }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [final.txt], absent: [draft.txt] }
+- id: files-05
+  type: files
+  skills: [files]
+  writes: true
+  prompt: "Create a folder {dir}/archive and move {dir}/report.txt into it."
+  files: { report.txt: quarterly numbers }
+  tools: [move, move_many]
+  check: { answered: true }
+  end: { exists: [archive/report.txt], absent: [report.txt] }
+- id: files-06
+  type: files
+  skills: [files]
+  prompt: "Read {dir}/prices.txt and tell me the total of all the numbers in it. Just the number."
+  files: { prices.txt: "apple 3\npear 4\nplum 5\n" }
+  tools: [read_text]
+  check: { number: 12 }
+- id: files-07
+  type: files
+  skills: [files]
+  prompt: "How many bytes is the file {dir}/big.txt? Just the number."
+  files: { big.txt: "0123456789012345678901234567890123456789" }
+  tools: [list_dir]
+  check: { number: 40 }
+- id: files-08
+  type: files
+  skills: [files]
+  writes: true
+  prompt: "Copy {dir}/a.txt to {dir}/b.txt and keep the original."
+  files: { a.txt: original content }
+  tools: [copy_verify]
+  check: { answered: true }
+  end: { exists: [a.txt], file_has: { b.txt: original content } }
+- id: files-09
+  type: files
+  skills: [files]
+  writes: true
+  prompt: "Read {dir}/todo.txt and create {dir}/urgent.txt containing only the lines that contain the word urgent."
+  files: { todo.txt: "urgent: fix the login bug\nbuy milk\nurgent: call the bank\nwater plants\n" }
+  tools: [write_text]
+  check: { answered: true }
+  end: { file_has: { urgent.txt: call the bank }, file_lacks: { urgent.txt: buy milk } }
+- id: files-10
+  type: files
+  skills: [files]
+  prompt: "Read {dir}/config.txt and tell me the value of the port setting. Just the number."
+  files: { config.txt: "host = localhost\nport = 8080\nmode = dev\n" }
+  tools: [read_text]
+  check: { number: 8080 }
+- id: code-runner-01
+  type: math
+  skills: [code-runner]
+  needs_sandbox: true
+  prompt: "Use Python to compute the sum of the squares of the integers from 1 to 30. Just the number."
+  tools: [run_python]
+  check: { number: 9455 }

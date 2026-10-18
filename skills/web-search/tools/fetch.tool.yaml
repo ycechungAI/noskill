@@ -1,0 +1,6 @@
+name: fetch
+description: Fetch a web page and return its text as Markdown.
+runtime: builtin
+entry: web.fetch
+timeout: 20s
+max_output: 32kb
