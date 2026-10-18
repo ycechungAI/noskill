@@ -1,10 +1,14 @@
 package cli
 
 import (
+	"context"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Make a key, publish a folder, add it as a registry, search it and install from it (FR-S10).
@@ -75,5 +79,54 @@ func TestDoctorFilesAndAnimeAudit(t *testing.T) {
 	}
 	if code, _, _ := h.run("", false, "anime", "audit", "--since", "soon"); code != ExitUsage {
 		t.Errorf("a bad --since: %d", code)
+	}
+}
+
+// `serve --no-jobs` answers requests but never runs a scheduled job, so a second server (ask.sh) can
+// sit next to the daemon without taking its jobs.
+func TestServeNoJobsRunsNoJobs(t *testing.T) {
+	h := newHarness(t)
+	old := schedulerTick
+	schedulerTick = 100 * time.Millisecond
+	defer func() { schedulerTick = old }()
+	h.ok("", false, "schedule", "add", "say hi", "--name", "j", "--every", "1h", "--paused")
+	h.ok("", false, "schedule", "resume", "j")
+	h.ok("", false, "schedule", "run", "j") // due now
+	port := freePort(t)
+	var out, errb safeBuffer
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan int, 1)
+	go func() {
+		done <- Main([]string{"--home", h.home, "serve", "--no-jobs", "--port", fmt.Sprint(port)}, Env{
+			Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errb, Environ: []string{}, Version: "test", StdinFD: -1,
+			Keychain: h.kc, Notifier: quiet{}, Trash: trashTo{h.trash}, Getwd: func() (string, error) { return t.TempDir(), nil },
+			Context: func() (context.Context, context.CancelFunc) { return context.WithCancel(ctx) },
+		})
+	}()
+	base := fmt.Sprintf("http://127.0.0.1:%d/ui", port)
+	var err error
+	for i := 0; i < 50; i++ {
+		var resp *http.Response
+		if resp, err = http.Get(base); err == nil {
+			resp.Body.Close()
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("server never came up: %v\n%s", err, errb.String())
+	}
+	time.Sleep(1500 * time.Millisecond) // many scheduler ticks, if there were a scheduler
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("serve didn't stop")
+	}
+	if !strings.Contains(errb.String(), "no scheduled jobs") {
+		t.Errorf("stderr doesn't say so: %s", errb.String())
+	}
+	if hist, _ := h.ok("", false, "schedule", "history", "j"); !strings.Contains(hist, "no runs yet") {
+		t.Errorf("a job ran in a --no-jobs server:\n%s", hist)
 	}
 }

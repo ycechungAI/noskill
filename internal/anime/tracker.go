@@ -54,9 +54,10 @@ type Settings struct {
 	// ReplaceVersions lets a fixed release (v2) of an episode noskill filed, at the same resolution,
 	// replace it: the old file goes to the OS trash first (SKILL.md "Rules").
 	ReplaceVersions bool
-	// AskFirst (ask_before_download) asks the user about each new release before it is downloaded
-	// (plan.go); without it releases of approved titles are added as they appear.
-	AskFirst bool
+	// AskMode (ask_before_download) says when the user is asked before a release is downloaded
+	// (plan.go): never, always, or only when the tracker is unsure it's the right show. Followed
+	// shows are never asked about: the user said they are downloading those for sure.
+	AskMode string
 }
 
 func (s Settings) withDefaults() Settings {
@@ -550,6 +551,7 @@ func Taste(m Media, liked []Media) (float64, string) {
 type match struct {
 	item NyaaItem
 	rel  Release
+	conf float64 // how sure the release is the title's (1 = the same name)
 }
 
 // releases returns a title's fresh English-subbed episodes on Nyaa, by episode key.
@@ -574,7 +576,7 @@ func (t *Tracker) releases(ctx context.Context, ts TitleState) (map[string][]mat
 		if r.Kind == "episode" && ts.Episodes > 0 && r.Episode > float64(ts.Episodes) {
 			continue // numbered across seasons ("S03E49"): it would be misnamed
 		}
-		out[EpisodeKey(r)] = append(out[EpisodeKey(r)], match{it, r})
+		out[EpisodeKey(r)] = append(out[EpisodeKey(r)], match{item: it, rel: r, conf: c})
 	}
 	return out, nil
 }
@@ -708,7 +710,7 @@ func (t *Tracker) download(ctx context.Context, lib Library, rep *Report) error 
 			if v := pick.rel.Version; v > 1 {
 				planKey += fmt.Sprintf(" v%d", v)
 			}
-			if yes, err := t.ask(ctx, rep, PlanItem{Kind: "release", Key: planKey, Title: ts.Title, Episode: k, Name: pick.item.Title, SizeText: pick.item.Size, URL: pick.item.TorrentURL}); err != nil {
+			if yes, err := t.ask(ctx, rep, pick.conf, PlanItem{Kind: "release", Key: planKey, Title: ts.Title, Episode: k, Name: pick.item.Title, SizeText: pick.item.Size, URL: pick.item.TorrentURL}); err != nil {
 				return err
 			} else if !yes {
 				continue

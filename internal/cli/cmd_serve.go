@@ -23,6 +23,7 @@ func cmdServe(c *cmd, args []string) int {
 	port := fs.Int("port", 0, "port to listen on (default: server.port, 11435)")
 	lan := fs.Bool("lan", false, "listen on all addresses; needs a [[server.tokens]] entry")
 	bind := fs.String("bind", "", "address to listen on (default: server.bind, 127.0.0.1)")
+	noJobs := fs.Bool("no-jobs", false, "serve the API and the status page only: no scheduled jobs, learning or approval sweeps run here (a second server, e.g. from ask.sh, next to the daemon)")
 	if _, err := c.parse(fs, args); err != nil {
 		return ExitUsage
 	}
@@ -57,43 +58,12 @@ func cmdServe(c *cmd, args []string) int {
 		c.errf("  Listening beyond this computer: every request needs a token.\n")
 	}
 
-	// The scheduler runs here, so jobs run wherever the server does: the daemon, or a foreground
-	// `noskill serve` (FR-J2). A lease in state.db keeps a second process from running them too.
-	sch := &scheduler.Scheduler{Store: &scheduler.Store{DB: a.DB}, Exec: app.Jobs{A: a}, Notify: a.NotifyJob,
-		MaxConcurrent: a.Cfg.Scheduler.MaxConcurrentJobs, Tick: schedulerTick, Check: &scheduler.PlatformChecker{Volumes: a.Volumes()},
-		Log: func(format string, args ...any) {
-			c.errf("%s %s\n", time.Now().Format("2006-01-02 15:04:05"), fmt.Sprintf(format, args...))
-		}}
-	schDone := make(chan struct{})
-	go func() {
-		defer close(schDone)
-		sch.Run(ctx)
-	}()
-	defer func() { <-schDone }() // running jobs are cancelled and recorded before the database closes
-
-	// The learning worker works only when noskill has been idle a while, on AC power (LEARNING.md).
-	learnDone := make(chan struct{})
-	go func() {
-		defer close(learnDone)
-		a.LearnLoop(ctx, func(format string, args ...any) {
-			c.errf("%s %s\n", time.Now().Format("2006-01-02 15:04:05"), fmt.Sprintf(format, args...))
-		})
-	}()
-	defer func() { <-learnDone }()
-
-	// Sweep expired approvals while serving.
-	go func() {
-		t := time.NewTicker(time.Minute)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				a.Approvals.ExpireDue(ctx)
-			}
-		}
-	}()
+	if *noJobs {
+		c.errf("  Page and API only: no scheduled jobs, learning or approval sweeps run in this process.\n")
+	} else {
+		stopWorkers := startWorkers(c, ctx, a)
+		defer stopWorkers()
+	}
 
 	errc := make(chan error, 1)
 	go func() { errc <- hs.Serve(ln) }()
@@ -109,4 +79,49 @@ func cmdServe(c *cmd, args []string) int {
 		c.errf("noskill: stopped\n")
 	}
 	return ExitOK
+}
+
+// startWorkers runs what a serving process does besides answering requests: the scheduler, the
+// learning worker and the approval sweep. The returned function waits for them to finish.
+func startWorkers(c *cmd, ctx context.Context, a *app.App) func() {
+	// The scheduler runs here, so jobs run wherever the server does: the daemon, or a foreground
+	// `noskill serve` (FR-J2). A lease in state.db keeps a second process from running them too.
+	sch := &scheduler.Scheduler{Store: &scheduler.Store{DB: a.DB}, Exec: app.Jobs{A: a}, Notify: a.NotifyJob,
+		MaxConcurrent: a.Cfg.Scheduler.MaxConcurrentJobs, Tick: schedulerTick, Check: &scheduler.PlatformChecker{Volumes: a.Volumes()},
+		Log: func(format string, args ...any) {
+			c.errf("%s %s\n", time.Now().Format("2006-01-02 15:04:05"), fmt.Sprintf(format, args...))
+		}}
+	schDone := make(chan struct{})
+	go func() {
+		defer close(schDone)
+		sch.Run(ctx)
+	}()
+
+	// The learning worker works only when noskill has been idle a while, on AC power (LEARNING.md).
+	learnDone := make(chan struct{})
+	go func() {
+		defer close(learnDone)
+		a.LearnLoop(ctx, func(format string, args ...any) {
+			c.errf("%s %s\n", time.Now().Format("2006-01-02 15:04:05"), fmt.Sprintf(format, args...))
+		})
+	}()
+
+	// Sweep expired approvals while serving.
+	go func() {
+		t := time.NewTicker(time.Minute)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				a.Approvals.ExpireDue(ctx)
+			}
+		}
+	}()
+
+	return func() {
+		<-schDone // running jobs are cancelled and recorded before the database closes
+		<-learnDone
+	}
 }

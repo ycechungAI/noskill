@@ -91,6 +91,12 @@ Two edits in `~/.noskill/config.toml` (backup: `config.toml.before-main-model`),
 - `gemma3:1b` (806 MB, no tool support) is the backup model and takes summarise and extract requests (two rules in the config, before the tools rule). It scored 10 of 11 on those checked tasks, the same as `llama3.2`, at 0.6 s a task. A request that needs tools skips those rules, so tool runs, `anime-nightly` included, use `granite4:3b`, and then `qwen3.5:4b` if that can't load.
 - Backup before this edit: `~/.noskill/config.toml.before-gemma`.
 
+## The new status page this week
+`./ask.sh` (repo root) runs the page with the Approvals, Downloads and History tabs from source on port 11436, next to the daemon, with `serve --no-jobs` so it runs no jobs. The installed binary and its page on :11435 are unchanged. Answers you give there are picked up by the daemon. The installed daemon's filing run doesn't know about downloads added by hand on the page: use "Stop seeding and file now" for those.
+
+## What gets asked (decided 2026-10-18)
+Followed donghua (Renegade Immortal, Battle Through the Heavens, A Mortal's Journey) download without asking: you are getting them for sure. New shows are asked about, as before. For episodes of shows you approved, the new `ask_before_download = "unsure"` (the default in the source; the installed binary doesn't have it yet) asks only when a release's name isn't exactly the show's. `true` asks about every episode of approved shows; `false` never does.
+
 ## Torrents not stopped after finishing (2026-10-18, 14:50)
 Two finished torrents were still seeding at 14:50: nothing stops a download when it finishes except the next filing run (16:00, 18:00, 20:00), and Transmission's "call script when download completes" never fired (`hook.log` has only my test line), most likely because Transmission was already running when the setting was written, so **quit and reopen Transmission once** to turn the hook on. I filed both by hand at 14:55 (`noskill anime run --stage file`). The source now adds each torrent with a zero ratio limit, so Transmission stops it by itself the instant it finishes; that needs the rebuilt binary. Until then: Transmission › Settings › Transfers › Seeding › "Stop seeding at ratio 0.0" does the same for every torrent.
 

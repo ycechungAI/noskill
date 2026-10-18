@@ -118,7 +118,7 @@ Built in block 5c (FR-S10, [ADR-0016](adr/0016-signed-skill-registry.md)). A reg
 
 | Command | Does |
 |---|---|
-| `noskill serve` | Foreground server (the daemon runs this too) on `127.0.0.1:11435`: OpenAI-compatible `/v1/*`, Ollama-compatible `/api/*` (same layout as Ollama on 11434, so apps just change the port), status page `/ui`. Flags: `--port`, `--lan --token <t>` to expose beyond localhost. Setup per chat app: [PROXY.md](PROXY.md) |
+| `noskill serve` | Foreground server (the daemon runs this too) on `127.0.0.1:11435`: OpenAI-compatible `/v1/*`, Ollama-compatible `/api/*` (same layout as Ollama on 11434, so apps just change the port), status page `/ui`. Flags: `--port`, `--lan --token <t>` to expose beyond localhost, `--no-jobs` (page and API only: no scheduled jobs, learning or approval sweeps run in this process, so a second server can sit next to the daemon; `ask.sh` uses it). Setup per chat app: [PROXY.md](PROXY.md) |
 
 ## Example session
 

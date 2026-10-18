@@ -223,11 +223,7 @@ func (t *Tracker) followDownload(ctx context.Context, rep *Report, all []Torrent
 			continue
 		}
 		line := fmt.Sprintf("%s (smallest of %d: %s, %s)", label, countEpisode(cands, n, func(c cand) float64 { return c.rel.Episode }), humanBytes(uint64(best.size)), best.rel.Group)
-		if yes, err := t.ask(ctx, rep, PlanItem{Kind: "release", Key: ReleaseKey(f.Title, key), Title: f.Title, Episode: "episode " + key, Name: best.item.Title, Size: best.size, URL: best.item.TorrentURL}); err != nil {
-			return err
-		} else if !yes {
-			continue
-		}
+		// Followed shows are never asked about (the user is downloading them for sure).
 		if t.DryRun {
 			rep.Added = append(rep.Added, line+" (dry run)")
 			continue
@@ -236,7 +232,6 @@ func (t *Tracker) followDownload(ctx context.Context, rep *Report, all []Torrent
 			rep.Problems = append(rep.Problems, fmt.Sprintf("%s: %v", label, err))
 			continue
 		}
-		t.planAdded(ctx, ReleaseKey(f.Title, key))
 		if ts.Fallback == nil {
 			ts.Fallback = map[string]string{}
 		}

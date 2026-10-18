@@ -41,6 +41,8 @@ Phase 0 ended in a **conditional go** ([PHASE0_GO_NO_GO.md](docs/spikes/PHASE0_G
 ## Docs
 Read them as a site: `go run ./scripts/docsite` writes `site/` (static HTML, no JavaScript; open `site/index.html`, or `docs-site` in `.claude/launch.json` serves it on :8767). It fails on a broken link, so the docs can't point at files that aren't there. Nothing is hosted yet. **Writing a skill? Start with [SKILL_AUTHORING.md](docs/SKILL_AUTHORING.md).**
 
+**The status page** (Overview, Approvals, Downloads, History): `./ask.sh` builds the current source, serves the page on `http://127.0.0.1:11436/ui` next to your daemon without running any jobs, and opens it (`./ask.sh downloads` opens that tab).
+
 | Doc | Contents |
 |---|---|
 | [SPEC.md](SPEC.md) | Requirements and acceptance criteria |

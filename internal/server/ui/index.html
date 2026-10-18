@@ -266,9 +266,11 @@ async function loadDownloads() {
 
 function renderDownloads() {
   if (!dl) return;
-  put("dl-ask", el("p", {class: "lead"}, dl.ask_first
-    ? ["Ask first is ", chip("on", "ok"), ": new episodes wait here for your yes before anything is downloaded."]
-    : ["Ask first is ", chip("off", "warn"), ": approved shows download as episodes appear. Turn it on with ", el("code", {}, "ask_before_download = \"true\""), " under ", el("code", {}, "[skills.anime-tracker]"), " in config.toml."]));
+  const code = t => el("code", {}, t);
+  put("dl-ask", el("p", {class: "lead"},
+    dl.ask_mode === "true" ? ["Asking about ", el("b", {}, "every episode"), " of the shows you approved. Followed shows are never asked about. Change it with ", code("ask_before_download"), " in ", code("[skills.anime-tracker]"), "."]
+    : dl.ask_mode === "false" ? ["Asking is ", chip("off", "warn"), ": approved shows download as episodes appear. New shows still need your yes (Approvals). Turn it on with ", code("ask_before_download = \"unsure\""), " under ", code("[skills.anime-tracker]"), "."]
+    : ["Asking only when ", el("b", {}, "unsure"), ": a release whose name isn't exactly the show's waits here for your yes. Followed shows and exact matches download on their own; new shows are asked about under Approvals."]));
   const asked = dl.items.filter(i => i.status === "asked" && i.approval_id);
   put("dl-waiting", asked.length ? table(["Download", "Asked", ""], asked.map(i => [
     el("span", {}, i.title, i.episode ? " " + i.episode : "", i.size_text || i.size ? el("span", {class: "mute"}, " · " + (i.size_text || size(i.size))) : null),

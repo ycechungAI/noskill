@@ -802,7 +802,7 @@ func TestPresetModelNames(t *testing.T) {
 func TestDownloadsEndpoints(t *testing.T) {
 	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {
 		c.Server.Tokens = []config.Token{{Name: "chat", Token: "secret:C"}, {Name: "tray", Token: "secret:T", Admin: true}}
-		c.Skills.Settings = map[string]map[string]any{"anime-tracker": {"client": "none", "ask_before_download": "true"}}
+		c.Skills.Settings = map[string]map[string]any{"anime-tracker": {"client": "none", "ask_before_download": "unsure"}}
 	}, map[string]string{"C": "chat-token-0123456789", "T": "tray-token-0123456789"})
 	chat := map[string]string{"Authorization": "Bearer chat-token-0123456789"}
 	tray := map[string]string{"Authorization": "Bearer tray-token-0123456789"}
@@ -817,6 +817,7 @@ func TestDownloadsEndpoints(t *testing.T) {
 	}
 	resp, body := g.do("GET", "/noskill/v1/downloads", nil, tray)
 	var v struct {
+		AskMode  string          `json:"ask_mode"`
 		AskFirst bool            `json:"ask_first"`
 		Problem  string          `json:"problem"`
 		Items    json.RawMessage `json:"items"`
@@ -824,7 +825,7 @@ func TestDownloadsEndpoints(t *testing.T) {
 		Filed    json.RawMessage `json:"filed"`
 		Folders  json.RawMessage `json:"folders"`
 	}
-	if resp.StatusCode != 200 || json.Unmarshal(body, &v) != nil || !v.AskFirst || v.Problem == "" || string(v.Items) != "[]" || string(v.Finished) != "[]" || string(v.Filed) != "[]" {
+	if resp.StatusCode != 200 || json.Unmarshal(body, &v) != nil || !v.AskFirst || v.AskMode != "unsure" || v.Problem == "" || string(v.Items) != "[]" || string(v.Finished) != "[]" || string(v.Filed) != "[]" {
 		t.Fatalf("GET downloads: %d %s", resp.StatusCode, body)
 	}
 	resp, body = g.do("POST", "/noskill/v1/downloads", map[string]string{"url": "magnet:?xt=urn:btih:" + strings.Repeat("a", 40)}, tray)

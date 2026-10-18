@@ -33,7 +33,8 @@ type FiledEpisode struct {
 
 // DownloadsView is the Downloads and History tabs' data.
 type DownloadsView struct {
-	AskFirst bool              `json:"ask_first"`
+	AskMode  string            `json:"ask_mode"`  // false | unsure | true
+	AskFirst bool              `json:"ask_first"` // the mode is not "false"
 	Client   string            `json:"client,omitempty"`
 	Problem  string            `json:"problem,omitempty"` // why there's no torrent app
 	Items    []anime.PlanItem  `json:"items"`             // questions and hand-added downloads, newest first
@@ -49,7 +50,8 @@ func (a *App) AnimeDownloads(ctx context.Context) (*DownloadsView, error) {
 	if err != nil {
 		return nil, err
 	}
-	v := &DownloadsView{AskFirst: t.Settings.AskFirst, Items: []anime.PlanItem{}, Finished: []FinishedTorrent{}, Filed: []FiledEpisode{}, Folders: []string{}}
+	mode := anime.ParseAskMode(t.Settings.AskMode)
+	v := &DownloadsView{AskMode: mode, AskFirst: mode != anime.AskNever, Items: []anime.PlanItem{}, Finished: []FinishedTorrent{}, Filed: []FiledEpisode{}, Folders: []string{}}
 	if items, err := t.State.Plans(ctx); err == nil && items != nil {
 		v.Items = items
 		if len(v.Items) > 100 {

@@ -81,7 +81,7 @@ func (t *Tracker) findBatch(items []NyaaItem, p Media) *match {
 		if p.Episodes > 0 && r.EpisodeEnd > 0 && int(r.EpisodeEnd) < p.Episodes {
 			continue // part of a season, not all of it
 		}
-		m := match{it, r}
+		m := match{item: it, rel: r, conf: c}
 		if best == nil {
 			best = &m
 			continue

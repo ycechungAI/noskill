@@ -122,13 +122,38 @@ func (s *State) setPlanStatus(ctx context.Context, key, status string) error {
 // ReleaseKey is the plan key of a release of a title's episode.
 func ReleaseKey(title, episode string) string { return "rel|" + title + "|" + episode }
 
-// ask decides whether a release may be added now. Without ask_before_download it always may. With
-// it, the first time a release is found it becomes a question for the user (an approval, which the
-// status page, the tray, the CLI and notifications all show), and it is added on the run after the
-// user says yes. A no is remembered, so it isn't asked again.
-func (t *Tracker) ask(ctx context.Context, rep *Report, p PlanItem) (bool, error) {
-	if !t.Settings.AskFirst {
+// ask_before_download values.
+const (
+	AskNever  = "false"  // releases of approved shows are added as they appear
+	AskAll    = "true"   // every release of an approved show is asked about first
+	AskUnsure = "unsure" // only when the tracker isn't sure the release is the show's (the default)
+)
+
+// ParseAskMode reads the setting: true/all, false/never/off, or unsure; anything else is unsure.
+func ParseAskMode(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "true", "all", "yes", "on", "always":
+		return AskAll
+	case "false", "never", "no", "off":
+		return AskNever
+	}
+	return AskUnsure
+}
+
+// ask decides whether a release may be added now. With ask_before_download = "false" it always
+// may. Otherwise the first time a release is found that needs a question (every release for "true";
+// for "unsure" only one whose name isn't exactly the show's, conf < 1) it becomes an approval, which
+// the status page, the tray, the CLI and notifications all show, and it is added on the run after
+// the user says yes. A no is remembered, so it isn't asked again.
+func (t *Tracker) ask(ctx context.Context, rep *Report, conf float64, p PlanItem) (bool, error) {
+	switch ParseAskMode(t.Settings.AskMode) {
+	case AskNever:
 		return true, nil
+	case AskUnsure:
+		if conf >= 1 {
+			return true, nil
+		}
+		p.Note = fmt.Sprintf("not sure this is the right show: the release is named %q", p.Name)
 	}
 	label := strings.TrimSpace(p.Title + " " + p.Episode)
 	cur, found, err := t.State.PlanByKey(ctx, p.Key)
@@ -147,8 +172,13 @@ func (t *Tracker) ask(ctx context.Context, rep *Report, p PlanItem) (bool, error
 		case p.SizeText != "":
 			summary += fmt.Sprintf(" (%s)", p.SizeText)
 		}
-		it, err := t.Ask.Create(ctx, approvals.New{Source: "skill", Kind: "download", Summary: summary + "?",
-			Details: map[string]any{"title": p.Title, "episode": p.Episode, "name": p.Name, "size": firstNonEmpty(p.SizeText, humanBytesIf(p.Size))},
+		if p.Note != "" {
+			summary = fmt.Sprintf("%s? Not sure it's the right show: the release is named %q", summary, p.Name)
+		} else {
+			summary += "?"
+		}
+		it, err := t.Ask.Create(ctx, approvals.New{Source: "skill", Kind: "download", Summary: summary,
+			Details: map[string]any{"title": p.Title, "episode": p.Episode, "name": p.Name, "size": firstNonEmpty(p.SizeText, humanBytesIf(p.Size)), "why": p.Note},
 			Timeout: 7 * 24 * time.Hour})
 		if err != nil {
 			return false, err
@@ -195,7 +225,7 @@ func (t *Tracker) ask(ctx context.Context, rep *Report, p PlanItem) (bool, error
 			}
 			// Nobody answered in time: ask again now, so the question is always on the page.
 			if !t.DryRun {
-				return t.ask(ctx, rep, p)
+				return t.ask(ctx, rep, conf, p)
 			}
 		default:
 			rep.Planned = append(rep.Planned, label+" (waiting for you)")
@@ -206,7 +236,7 @@ func (t *Tracker) ask(ctx context.Context, rep *Report, p PlanItem) (bool, error
 
 // planAdded records that a release the user approved went to the torrent app.
 func (t *Tracker) planAdded(ctx context.Context, key string) {
-	if t.Settings.AskFirst && !t.DryRun {
+	if ParseAskMode(t.Settings.AskMode) != AskNever && !t.DryRun {
 		t.State.setPlanStatus(ctx, key, PlanAdded)
 	}
 }

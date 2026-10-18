@@ -22,7 +22,12 @@ type planRig struct {
 	srvs                      []*httptest.Server
 }
 
-func newPlanRig(t *testing.T, askFirst bool) *planRig {
+func newPlanRig(t *testing.T, mode string) *planRig {
+	return newPlanRigFor(t, mode, "[SubsPlease] Test Show - 01 (480p) [AAAA1111].mkv", "Test Show")
+}
+
+// newPlanRigFor is a rig whose one release has this feed name, for a show known as alias.
+func newPlanRigFor(t *testing.T, mode, release, alias string) *planRig {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -35,9 +40,9 @@ func newPlanRig(t *testing.T, askFirst bool) *planRig {
 	for _, d := range []string{r.dest, r.downloads, r.trashDir} {
 		os.MkdirAll(d, 0o755)
 	}
-	ny := fakeNyaa([]rss{{"[SubsPlease] Test Show - 01 (480p) [AAAA1111].mkv", 2 * time.Hour, 100}})
+	ny := fakeNyaa([]rss{{release, 2 * time.Hour, 100}})
 	r.tr = &fakeTransmission{names: map[string]string{}}
-	r.tr.names[fmt.Sprintf("%s/download/0.torrent", ny.URL)] = "[SubsPlease] Test Show - 01 (480p) [AAAA1111].mkv"
+	r.tr.names[fmt.Sprintf("%s/download/0.torrent", ny.URL)] = release
 	trs := httptest.NewServer(r.tr)
 	r.srvs = []*httptest.Server{ny, trs}
 	t.Cleanup(func() {
@@ -49,9 +54,9 @@ func newPlanRig(t *testing.T, askFirst bool) *planRig {
 	r.tk = &Tracker{State: &State{DB: db, Now: func() time.Time { return now }}, Nyaa: &Nyaa{Base: ny.URL},
 		Client: &Transmission{Base: trs.URL, Label: "noskill-anime", SavePath: r.downloads}, Ask: r.ask, Files: fakeFiles{r.trashDir},
 		Now:         func() time.Time { return now },
-		Settings:    Settings{DefaultDest: r.dest, AskFirst: askFirst, Naming: Naming{TitleFolders: true}},
+		Settings:    Settings{DefaultDest: r.dest, AskMode: mode, Naming: Naming{TitleFolders: true}},
 		ResolveDest: func(p string) (string, error) { return p, nil }}
-	if err := r.tk.State.PutTitle(ctx, TitleState{ID: 1, Title: "Test Show", Aliases: []string{"Test Show"}, Status: Approved, Dest: r.dest, Resolution: "480p"}); err != nil {
+	if err := r.tk.State.PutTitle(ctx, TitleState{ID: 1, Title: alias, Aliases: []string{alias}, Status: Approved, Dest: r.dest, Resolution: "480p"}); err != nil {
 		t.Fatal(err)
 	}
 	return r
@@ -59,7 +64,7 @@ func newPlanRig(t *testing.T, askFirst bool) *planRig {
 
 // Added torrents stop seeding the moment they finish: a zero ratio limit for that torrent.
 func TestAddedTorrentStopsAtCompletion(t *testing.T) {
-	r := newPlanRig(t, false)
+	r := newPlanRig(t, AskNever)
 	if rep, err := r.tk.Run(context.Background(), "download"); err != nil || len(rep.Added) != 1 {
 		t.Fatalf("%v %+v skipped %v problems %v", err, rep, rep.Skipped, rep.Problems)
 	}
@@ -78,7 +83,7 @@ func TestAddedTorrentStopsAtCompletion(t *testing.T) {
 // says yes, a yes adds it once, and a no is remembered.
 func TestAskBeforeDownload(t *testing.T) {
 	ctx := context.Background()
-	r := newPlanRig(t, true)
+	r := newPlanRig(t, AskAll)
 
 	rep, err := r.tk.Run(ctx, "download")
 	if err != nil || len(rep.Planned) != 1 || len(rep.Added) != 0 || len(r.tr.torrents) != 0 {
@@ -114,7 +119,7 @@ func TestAskBeforeDownload(t *testing.T) {
 	}
 
 	// No: never asked again, never added.
-	r2 := newPlanRig(t, true)
+	r2 := newPlanRig(t, AskAll)
 	r2.tk.Run(ctx, "download")
 	it = r2.ask.items["a1"]
 	it.Status = approvals.Skipped
@@ -128,7 +133,7 @@ func TestAskBeforeDownload(t *testing.T) {
 	}
 
 	// An unanswered question that expired is asked again.
-	r3 := newPlanRig(t, true)
+	r3 := newPlanRig(t, AskAll)
 	r3.tk.Run(ctx, "download")
 	it = r3.ask.items["a1"]
 	it.Status = approvals.Expired
@@ -145,7 +150,7 @@ const btih = "0123456789abcdef0123456789abcdef01234567"
 // the folder they chose under the name they gave; it never leaves that folder.
 func TestManualDownload(t *testing.T) {
 	ctx := context.Background()
-	r := newPlanRig(t, false)
+	r := newPlanRig(t, AskNever)
 	folder := filepath.Join(filepath.Dir(r.dest), "Mine")
 
 	for _, bad := range []string{"", "file:///etc/passwd", "http://x.test/a.torrent", "https://x.test/page", "magnet:?dn=nohash", "javascript:alert(1)"} {
@@ -222,4 +227,52 @@ func TestManualDownload(t *testing.T) {
 		t.Errorf("a torrent with an unfiled file was removed: %d", len(r.tr.torrents))
 	}
 	_ = item2
+}
+
+// "Ask me about what you're not sure of": an exact name is downloaded; a release whose name is only
+// close (0.9 or more, not the same) is asked about, with the reason; followed shows are never asked.
+func TestAskOnlyWhenUnsure(t *testing.T) {
+	ctx := context.Background()
+
+	sure := newPlanRig(t, AskUnsure)
+	if rep, err := sure.tk.Run(ctx, "download"); err != nil || len(rep.Added) != 1 || len(rep.Planned) != 0 || len(sure.ask.items) != 0 {
+		t.Fatalf("an exact match was asked about: %v %+v approvals %d", err, rep, len(sure.ask.items))
+	}
+
+	unsure := newPlanRigFor(t, AskUnsure, "[SubsPlease] Test Show Alpha Beta Gamma Delta - 01 (480p) [AAAA1111].mkv", "Test Show Alpha Beta Gamma")
+	rep, err := unsure.tk.Run(ctx, "download")
+	if err != nil || len(rep.Added) != 0 || len(rep.Planned) != 1 || len(unsure.tr.torrents) != 0 {
+		t.Fatalf("a close match wasn't asked about: %v %+v", err, rep)
+	}
+	it := unsure.ask.items["a1"]
+	if it.Kind != "download" || !strings.Contains(it.Summary, "Not sure it's the right show") || !strings.Contains(it.Summary, "Delta") {
+		t.Errorf("the question doesn't say why: %q", it.Summary)
+	}
+	it.Status = approvals.Approved
+	unsure.ask.items["a1"] = it
+	if rep, _ = unsure.tk.Run(ctx, "download"); len(rep.Added) != 1 {
+		t.Errorf("not added after a yes: %+v", rep)
+	}
+
+	// Never: even a close match goes straight in.
+	never := newPlanRigFor(t, AskNever, "[SubsPlease] Test Show Alpha Beta Gamma Delta - 01 (480p) [AAAA1111].mkv", "Test Show Alpha Beta Gamma")
+	if rep, _ = never.tk.Run(ctx, "download"); len(rep.Added) != 1 || len(never.ask.items) != 0 {
+		t.Errorf("mode false asked: %+v", rep)
+	}
+	for in, want := range map[string]string{"": AskUnsure, "unsure": AskUnsure, "TRUE": AskAll, "all": AskAll, "false": AskNever, "off": AskNever, "banana": AskUnsure} {
+		if got := ParseAskMode(in); got != want {
+			t.Errorf("ParseAskMode(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// A followed show is never asked about, even when every release is (the tracker has no way to ask:
+// Ask is nil here, so an attempt would panic).
+func TestFollowedShowsAreNeverAskedAbout(t *testing.T) {
+	tk, tr, _, _ := followFixture(t, [][2]string{{"[BonoboSubs]Renegade Immortal - 仙逆 Xian Ni - 163", "740 MiB"}})
+	tk.Settings.AskMode = AskAll
+	rep, err := tk.Run(context.Background(), "download")
+	if err != nil || len(rep.Added) != 1 || len(rep.Planned) != 0 || len(tr.torrents) != 1 {
+		t.Fatalf("a followed show was held back: %v %+v", err, rep)
+	}
 }
