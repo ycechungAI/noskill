@@ -152,6 +152,9 @@ func (s *Skill) checkMeta(warn func(string, ...any)) {
 			warn("filesystem permission %q: want read:<path> or write:<path>", p)
 		}
 	}
+	if b := m.Budget; b.Steps < 0 || b.Tokens < 0 || b.Steps > MaxSkillSteps || b.Tokens > MaxSkillTokens {
+		warn("budget: steps 0-%d and tokens 0-%d (a skill can't ask for more; %d steps / %d tokens asked)", MaxSkillSteps, MaxSkillTokens, b.Steps, b.Tokens)
+	}
 	for _, sec := range m.Permissions.SecretList() {
 		if sec.Name == "" || strings.ContainsAny(sec.Name, " =\x00") {
 			warn("secret name %q isn't valid", sec.Name)

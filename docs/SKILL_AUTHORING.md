@@ -99,6 +99,8 @@ noskill:
 ---
 ```
 
+**Long runs.** A run stops after 25 steps by default. A skill that really needs more says so with `budget: { steps: 160, tokens: 400000 }` (at most 200 steps and 500,000 tokens), and `--budget-steps` or `--budget-tokens` from the user still win. The `storm` skill is the other way round: its whole job is one tool call, `storm_run`, because a 3B model skipped a 60-step procedure; see [LEARNING.md](LEARNING.md#seed-skill-storm-research-block-5e). A skill that is a long procedure for a small model is usually better as a tool that runs the loop in Go.
+
 ### The fields that matter most
 
 | Field | Why it matters |
@@ -190,10 +192,11 @@ Built-in tools are listed in a skill's `tools:` as `builtin: <id>`. The ones tha
 
 | Area | Tools |
 |---|---|
-| Files | `list_dir`, `read_text`, `write_text` (new files only), `move`, `move_many` (dry run first), `copy_verify`, `make_dir`, `trash`, `volumes`, `sanitize_name` |
+| Files | `list_dir`, `read_text`, `write_text` (new files only), `join_files` (a new file made of several, in order), `move`, `move_many` (dry run first), `copy_verify`, `make_dir`, `trash`, `volumes`, `sanitize_name` |
 | Code | `run_python` (sandboxed) |
 | Models | `list_models`, `machine_info`, `suggest_models`, `pull_model`, `remove_model`, `bench_model`, `route`, `delegate`, `plan_questions`, `notes` |
 | Docs | `docs_index`, `docs_search`, `docs_read` |
+| Notes | `notes`: scratch notes for the run. Give `name` for a separate lane (one per viewpoint); `read` returns the newest `max_chars` (6,000 by default) of a lane or of all of them; `lanes` lists them; `sources` numbers every distinct URL in the notes, for a reference list |
 | Watching | `watch_add`, `watch_check`, `watch_list`, `watch_remove` |
 | Anime | `anime_detect`, `anime_run`, `anime_status` |
 

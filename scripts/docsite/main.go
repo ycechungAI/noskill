@@ -49,7 +49,7 @@ type group struct {
 var groups = []group{
 	{"Start", []string{"README.md", "docs/VISION.md", "docs/CLI.md", "docs/CONFIG.md"}},
 	{"Skills", []string{"docs/SKILL_AUTHORING.md", "docs/SKILL_FORMAT.md", "docs/LEARNING.md", "skills/README.md",
-		"skills/web-search/SKILL.md", "skills/research/SKILL.md", "skills/files/SKILL.md", "skills/code-runner/SKILL.md",
+		"skills/web-search/SKILL.md", "skills/research/SKILL.md", "skills/storm/SKILL.md", "skills/files/SKILL.md", "skills/code-runner/SKILL.md",
 		"skills/local-docs/SKILL.md", "skills/watcher/SKILL.md", "skills/anime-tracker/SKILL.md", "skills/model-manager/SKILL.md",
 		"skills/orchestrator/SKILL.md", "skills/skill-author/SKILL.md"}},
 	{"How it works", []string{"docs/ARCHITECTURE.md", "docs/ORCHESTRATOR.md", "docs/MODEL_ADAPTERS.md", "docs/PROXY.md",

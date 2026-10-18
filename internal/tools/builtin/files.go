@@ -35,6 +35,9 @@ func Files() []tools.Builtin {
 		{ID: "write_text", Description: "Create a new text file. Refuses to replace an existing file.",
 			Schema: obj(`{"type":"object","required":["path","content"],"properties":{"path":{"type":"string"},"content":{"type":"string"}}}`),
 			Run:    writeText},
+		{ID: "join_files", Description: "Make a new text file by joining existing text files in the order given, with a blank line between them. The sources are kept. Refuses to replace an existing file.",
+			Schema: obj(`{"type":"object","required":["from","to"],"properties":{"from":{"type":"array","minItems":1,"maxItems":40,"items":{"type":"string"}},"to":{"type":"string"}}}`),
+			Run:    joinFiles},
 		{ID: "move", Description: "Move or rename one file or folder. Refuses to replace an existing one.",
 			Schema: obj(`{"type":"object","required":["from","to"],"properties":{"from":{"type":"string"},"to":{"type":"string"}}}`),
 			Run:    moveOne},
@@ -206,6 +209,51 @@ func writeText(ctx context.Context, env *tools.Env, raw json.RawMessage) (string
 		return "", friendly(err)
 	}
 	return jsonOut(map[string]any{"written": p, "bytes": len(a.Content)})
+}
+
+// joinFiles writes one new file made of several text files (a report from its sections). Each
+// source needs read scope, the target write scope; nothing is replaced.
+func joinFiles(ctx context.Context, env *tools.Env, raw json.RawMessage) (string, error) {
+	var a struct {
+		From []string
+		To   string
+	}
+	arg(raw, &a)
+	if len(a.From) == 0 || a.To == "" {
+		return "", errors.New(`join_files needs "from" (a list of files) and "to"`)
+	}
+	const maxEach, maxAll = 1 << 20, 4 << 20
+	var parts []string
+	total := 0
+	for _, f := range a.From {
+		p, err := env.Expand(f)
+		if err != nil {
+			return "", err
+		}
+		if p, err = env.Perms.CheckRead(p); err != nil {
+			return "", err
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return "", friendly(err)
+		}
+		if len(b) > maxEach || !utf8.Valid(b) {
+			return "", fmt.Errorf("%s isn't a text file of a size to join (1 MB at most)", f)
+		}
+		if total += len(b); total > maxAll {
+			return "", errors.New("the files are too big to join (4 MB at most)")
+		}
+		parts = append(parts, strings.TrimRight(string(b), "\n"))
+	}
+	to, err := env.Expand(a.To)
+	if err != nil {
+		return "", err
+	}
+	out := strings.Join(parts, "\n\n") + "\n"
+	if err := env.Broker.WriteFile(ctx, to, []byte(out)); err != nil {
+		return "", friendly(err)
+	}
+	return jsonOut(map[string]any{"written": to, "bytes": len(out), "files": len(a.From)})
 }
 
 // friendly rewrites broker errors for the model: say what to do, not what happened internally.

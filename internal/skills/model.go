@@ -78,6 +78,7 @@ type Meta struct {
 	TaskTypes       []string             `yaml:"task_types"`
 	MinModel        MinModel             `yaml:"min_model"`
 	PreferModels    []string             `yaml:"prefer_models"`
+	Budget          Budget               `yaml:"budget"`
 	Permissions     Permissions          `yaml:"permissions"`
 	Confirm         []string             `yaml:"confirm"`
 	ToolRefs        []ToolRef            `yaml:"tools"`
@@ -86,6 +87,19 @@ type Meta struct {
 	Decisions       map[string]any       `yaml:"decisions"`
 	Extra           map[string]yaml.Node `yaml:",inline"`
 }
+
+// Budget is what a skill that needs a long run asks for (a research across five viewpoints takes
+// well over the default 25 steps). The user's --budget-steps and --budget-tokens win; no skill can
+// ask for more than MaxSkillSteps and MaxSkillTokens.
+type Budget struct {
+	Steps  int `yaml:"steps"`
+	Tokens int `yaml:"tokens"`
+}
+
+const (
+	MaxSkillSteps  = 200
+	MaxSkillTokens = 500000
+)
 
 type MinModel struct {
 	Context int    `yaml:"context"`

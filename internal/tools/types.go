@@ -99,6 +99,26 @@ type Services interface {
 	NotesDir(runID string) (string, error)
 	// PlanQuestions asks the driver model for sub-questions (structured output).
 	PlanQuestions(ctx context.Context, goal string, n int) ([]string, error)
+	// Storm researches a topic from five viewpoints, one at a time, and writes the report's
+	// pieces (the pipeline runs in Go; the model gets one small job at a time).
+	Storm(ctx context.Context, topic string, perViewpoint int) (*StormResult, error)
+}
+
+// StormResult is a finished STORM research: the files of the report folder (the caller writes them
+// where the user's permissions allow) and how it went.
+type StormResult struct {
+	Files       []StormFile `json:"files"`
+	Summary     string      `json:"summary"`
+	Answered    int         `json:"answered"`    // questions answered from fetched pages
+	Unsupported int         `json:"unsupported"` // questions no fetched page supported
+	Sources     int         `json:"sources"`
+	Sections    int         `json:"sections"`
+}
+
+// StormFile is one file of the report folder, by relative name.
+type StormFile struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
 }
 
 // SubTask is one item of a batch delegation.

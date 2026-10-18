@@ -7,11 +7,11 @@ import (
 	"io/fs"
 )
 
-//go:embed web-search research files orchestrator model-manager code-runner anime-tracker watcher local-docs
+//go:embed web-search research storm files orchestrator model-manager code-runner anime-tracker watcher local-docs
 var embedded embed.FS
 
 // Builtin is the built-in skills, one folder per skill.
 func Builtin() fs.FS { return embedded }
 
 // Names lists the embedded skills.
-var Names = []string{"web-search", "research", "files", "orchestrator", "model-manager", "code-runner", "anime-tracker", "watcher", "local-docs"}
+var Names = []string{"web-search", "research", "storm", "files", "orchestrator", "model-manager", "code-runner", "anime-tracker", "watcher", "local-docs"}

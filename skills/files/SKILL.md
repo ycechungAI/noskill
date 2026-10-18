@@ -16,6 +16,7 @@ noskill:
     - builtin: list_dir       # { path, glob?, recursive? } → entries with size, mtime
     - builtin: read_text      # { path, max_chars? }
     - builtin: write_text     # { path, content }: creates a new file, never replaces one
+    - builtin: join_files     # { from: [paths], to }: a new text file made of the files in order (a report from its sections); never replaces one
     - builtin: make_dir       # { path }: creates the folder and any missing parents inside the allowed scope
     - builtin: move           # { from, to }  (rename = move in same dir)
     - builtin: move_many      # { plan: [{from,to}] } dry-run first, then apply

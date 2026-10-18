@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -84,7 +85,37 @@ func TestAllSkillDraftsParse(t *testing.T) {
 			}
 		}
 	}
-	if n != 10 {
-		t.Errorf("found %d skill folders, want 10", n)
+	if n != 11 {
+		t.Errorf("found %d skill folders, want 11", n)
+	}
+}
+
+// STORM is a skill for small models: one tool call does the work (a 3B model skipped a procedure
+// of steps), and the skill names the five viewpoints in order.
+func TestStormSkillShape(t *testing.T) {
+	set, _ := skills.LoadAll([]skills.Root{{Source: skills.SourceBuiltin, FS: skillfiles.Builtin()}})
+	s, ok := set.Get("storm")
+	if !ok {
+		t.Fatal("storm didn't load")
+	}
+	last := -1
+	for _, v := range []string{"practitioner", "academic", "skeptic", "economist", "historian"} {
+		i := strings.Index(s.Body, v)
+		if i < 0 || i < last {
+			t.Errorf("viewpoint %q is missing or out of order", v)
+		}
+		last = i
+	}
+	if lines := strings.Count(s.Body, "\n"); lines > 40 {
+		t.Errorf("%d lines in the body: a 4B model won't follow that", lines)
+	}
+	if len(s.Tools) != 1 || s.Tools[0].Entry != "storm_run" {
+		t.Errorf("the skill should offer storm_run and nothing else: %+v", s.Tools)
+	}
+	if len(s.Meta.DependsOn) != 0 {
+		t.Errorf("a depends_on would hand the model web tools to use instead: %v", s.Meta.DependsOn)
+	}
+	if !slices.Contains([]string(s.Meta.Permissions.Network), "*") || len(s.Meta.Permissions.Filesystem) != 1 || !strings.Contains(s.Meta.Permissions.Filesystem[0], "noskill-research") {
+		t.Errorf("permissions %+v", s.Meta.Permissions)
 	}
 }

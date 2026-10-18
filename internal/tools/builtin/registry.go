@@ -8,6 +8,7 @@ func Registry() tools.Registry {
 	r.Add(Web()...)
 	r.Add(Files()...)
 	r.Add(Models()...)
+	r.Add(Storm()...)
 	r.Add(Code()...)
 	r.Add(Anime()...)
 	r.Add(Watcher()...)

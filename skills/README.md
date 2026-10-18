@@ -4,6 +4,7 @@
 |---|---|---|
 | [web-search](web-search/SKILL.md) | P0 · v0.1 | Search and read web pages, with sources |
 | [research](research/SKILL.md) | P0 · v0.1 | Multi-step research → cited report |
+| [storm](storm/SKILL.md) | P1 · v0.1 | STORM-style research from five viewpoints (practitioner, academic, skeptic, economist, historian), one at a time, merged into one cited report (block 5e). One tool call, `storm_run`: the loop runs in Go |
 | [orchestrator](orchestrator/SKILL.md) | P0 · v0.1 | Pick and hand work to the right local model |
 | [files](files/SKILL.md) | P0 · v0.2 | Scoped file operations, external drives, undo |
 | [model-manager](model-manager/SKILL.md) | P0 · v0.1 | Suggest, pull, bench and clean up models for this machine |

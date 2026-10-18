@@ -36,6 +36,7 @@ noskill:
     - "latest news on"
   task_types: [research, chat]
   min_model: { context: 4096, tools: any }   # any | native | none
+  budget: { steps: 160, tokens: 400000 }     # optional: a skill that needs a long run asks for more than the default 25 steps / 60k tokens (at most 200 steps, 500k tokens); the user's --budget-steps and --budget-tokens win
   prefer_models: []          # routing hints, e.g. ["qwen3:*"]
   permissions:
     network: ["*"]           # domains; "*" = any (needs user approval at install)

@@ -57,5 +57,5 @@ internal/server/        ✓ Host/Origin/token checks, OpenAI + Ollama proxy, /no
 internal/platform/      ✓ per-OS: paths, trash, memory, sandbox (macOS only), clone, volumes list and IDs, power, installed apps, app prefs, plain notifications
 internal/store/         ✓ sqlite + forward-only migrations
 scripts/docsite/        ✓ builds the docs site from the Markdown (static HTML; fails on broken links; `go run ./scripts/docsite`)
-skills/                 ✓ 9 built-in skills embedded (web-search, research, files, orchestrator, model-manager, code-runner, anime-tracker, watcher, local-docs); skill-author is a spec for the learning loop
+skills/                 ✓ 10 built-in skills embedded (web-search, research, storm, files, orchestrator, model-manager, code-runner, anime-tracker, watcher, local-docs); skill-author is a spec for the learning loop
 ```

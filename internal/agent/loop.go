@@ -39,7 +39,7 @@ func DefaultBudget() Budget {
 		ObservationTokens: 1500, ContextTokens: 8192,
 		// One call of these runs a whole pipeline (feeds, downloads, copies of big files, indexing).
 		// Cutting it off at two minutes stopped the first scheduled anime run half way.
-		ToolTimeouts: map[string]time.Duration{"anime_run": 45 * time.Minute, "docs_index": 30 * time.Minute}}
+		ToolTimeouts: map[string]time.Duration{"anime_run": 45 * time.Minute, "docs_index": 30 * time.Minute, "storm_run": 90 * time.Minute}}
 }
 
 // toolTimeout is how long a call of tool name may take.

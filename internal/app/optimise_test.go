@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -246,5 +247,56 @@ func TestOptimiseReportAdoptAndTaskLimit(t *testing.T) {
 	out, err = e2.app.OptimiseSkill(ctx, opts(OptimiseOptions{DryRun: true, MaxTasks: 6}, 12, 6))
 	if err != nil || len(out.Train) != 6 || len(out.Held) != 2 {
 		t.Errorf("%v: %d train, %d held", err, len(out.Train), len(out.Held))
+	}
+}
+
+// A skill that declares a budget gets a longer run than the default 25 steps; --budget-steps from
+// the user still wins, and no skill can ask for more than the cap.
+func TestSkillBudgetLengthensTheRun(t *testing.T) {
+	calls := 0
+	fake := &backendtest.Fake{Reply: func(r backends.ChatRequest) (backends.Response, error) {
+		if r.Format != nil {
+			return backends.Response{Content: "{}"}, nil
+		}
+		n := 0
+		for _, m := range r.Messages {
+			if m.Role == backends.RoleTool {
+				n++
+			}
+		}
+		if n < 30 {
+			calls = max(calls, n+1) // the most tool calls the model got to make
+			return backends.Response{ToolCalls: []backends.ToolCall{{Name: "notes", Args: json.RawMessage(fmt.Sprintf(`{"action":"append","text":"fact %d"}`, n))}}}, nil
+		}
+		return backends.Response{Content: "all done"}, nil
+	}}
+	run := func(steps int, budget string) *RunResult {
+		e := newApp(t, fake, noRules, "")
+		dir := filepath.Join(e.home, "skills", "longrun")
+		os.MkdirAll(dir, 0o700)
+		md := "---\nname: longrun\ndescription: A very long chore with many small steps, for the budget test only.\nnoskill:\n  version: 1.0.0\n  triggers: [many small steps]\n" +
+			budget + "  tools:\n    - builtin: notes\n---\n## Steps\n1. Call `notes` for every fact.\n"
+		os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(md), 0o600)
+		if err := e.app.Reload(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		calls = 0
+		res, err := e.app.Run(context.Background(), RunRequest{Messages: user("do the long chore with many small steps"), Skills: []string{"longrun"}, MaxSteps: steps})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	if res := run(0, ""); res.Answer == "all done" || calls != 26 { // the 26th ask is the one the budget refuses
+		t.Errorf("without a budget: answer %q after %d asks (want the default 25-step stop)", res.Answer, calls)
+	}
+	if res := run(0, "  budget: { steps: 60 }\n"); res.Answer != "all done" || calls != 30 {
+		t.Errorf("with budget.steps 60: answer %q after %d calls", res.Answer, calls)
+	}
+	if res := run(10, "  budget: { steps: 60 }\n"); res.Answer == "all done" || calls != 11 {
+		t.Errorf("--budget-steps must win: answer %q after %d asks", res.Answer, calls)
+	}
+	if res := run(0, "  budget: { steps: 5000 }\n"); res.Answer != "all done" {
+		t.Errorf("an over-large ask should be capped at %d, not ignored: %q", 200, res.Answer)
 	}
 }

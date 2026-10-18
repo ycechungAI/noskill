@@ -595,6 +595,15 @@ func (a *App) Run(ctx context.Context, req RunRequest) (*RunResult, error) {
 	if req.MaxTokens > 0 {
 		b.MaxTokens = req.MaxTokens
 	}
+	// A skill that needs a long run asks for more (skills.Budget); a flag from the user wins.
+	for _, sk := range p.primaries {
+		if req.MaxSteps == 0 {
+			b.MaxSteps = max(b.MaxSteps, min(sk.Meta.Budget.Steps, skills.MaxSkillSteps))
+		}
+		if req.MaxTokens == 0 {
+			b.MaxTokens = max(b.MaxTokens, min(sk.Meta.Budget.Tokens, skills.MaxSkillTokens))
+		}
+	}
 	b.ContextTokens = a.numCtx(p.pick)
 	alwaysThinks := p.pick.Has(backends.CapThinkAlways)
 	if alwaysThinks {
