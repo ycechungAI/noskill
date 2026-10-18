@@ -69,6 +69,8 @@ Built in block 5c (FR-S10, [ADR-0016](adr/0016-signed-skill-registry.md)). A reg
 
 | Command | Does |
 |---|---|
+| `noskill anime add <link> [--to folder] [--name n]` | Add a download by hand: a magnet link, an https `.torrent` link or a Nyaa page. It is filed in the folder when it finishes (every file; one file takes `--name`), and stops seeding then. The status page's Downloads tab does the same |
+| `noskill anime file-now` | Stop finished downloads seeding and file them now, as the next filing run would |
 | `noskill anime audit [--since 24h] [--job anime-nightly]` | The week run's morning check as one command: the job ran and didn't fail, every file it filed is named title + episode (+ resolution) with no release leftovers, nothing changed in its destination folders that it didn't record, and a dry-run undo plans every step. Prints PASS or FAIL, exits 1 on a FAIL, and appends the result to `<data>/logs/week-audit.jsonl` ([WEEK_RUN.md](WEEK_RUN.md)) |
 | `noskill doctor --files` | Adds one real move, copy, trash and `undo` in a folder of noskill's own (it uses the OS trash and leaves two small items there). The Windows and Linux gate for Phase 3: no Recycle Bin location is reported on Windows, so a trash step can't be undone by noskill there, and the test says so as a warning |
 

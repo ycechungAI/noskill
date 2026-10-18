@@ -64,7 +64,7 @@ func animeAudit(c *cmd, ctx context.Context, a *app.App, args []string) int {
 // cmdAnime runs the anime tracker (skills/anime-tracker/SKILL.md) without a model: `detect` lists
 // the torrent apps found, `run` does one pass of its stages, `status` lists the titles it knows.
 func cmdAnime(c *cmd, args []string) int {
-	usage := "usage: noskill anime detect | scan [--offline] [folder…] | run [--stage answers|suggest|download|file] [--dry-run] | status | audit [--since 24h] [--job anime-nightly]"
+	usage := "usage: noskill anime detect | scan [--offline] [folder…] | run [--stage answers|suggest|download|file] [--dry-run] | status | add <link> [--to folder] [--name n] | file-now | audit [--since 24h] [--job anime-nightly]"
 	if len(args) == 0 {
 		return c.usageErr(usage)
 	}
@@ -156,6 +156,35 @@ func cmdAnime(c *cmd, args []string) int {
 		return ExitOK
 	case "audit":
 		return animeAudit(c, ctx, a, args[1:])
+	case "add":
+		fs := flag.NewFlagSet("anime add", flag.ContinueOnError)
+		to := fs.String("to", "", "the folder it is filed in when it finishes (default: the tracker's default folder)")
+		name := fs.String("name", "", "the file name to keep (a single file only)")
+		rest, err := c.parse(fs, args[1:])
+		if err != nil || len(rest) != 1 {
+			return c.usageErr("usage: noskill anime add <magnet link | https .torrent link | Nyaa page> [--to folder] [--name n]")
+		}
+		item, err := a.AnimeAddDownload(ctx, rest[0], *to, *name)
+		if err != nil {
+			return c.fail(err)
+		}
+		if c.g.json {
+			c.printJSON(item)
+			return ExitOK
+		}
+		c.outf("Added %q: it is filed in %s when it finishes, and stops seeding then.\n", item.Title, item.Dest)
+		return ExitOK
+	case "file-now":
+		rep, err := a.AnimeFileNow(ctx)
+		if err != nil {
+			return c.fail(err)
+		}
+		if c.g.json {
+			c.printJSON(rep)
+			return ExitOK
+		}
+		c.outf("%s\n", rep.String())
+		return ExitOK
 	case "status":
 		st := &anime.State{DB: a.DB}
 		titles, err := st.Titles(ctx)

@@ -42,7 +42,10 @@ How chat apps, editors and scripts get skills without changing anything but a UR
 | `GET /events` | Server-sent events: approval created/resolved, run finished. For the tray and status page |
 | `GET /status` | **Admin.** One snapshot: loaded model, backends, models with speed and quality scores, jobs, approvals, recent runs, skills, learning queue, eval runs |
 | `POST /jobs/{id}/{pause\|resume\|run}`, `POST /jobs/all/{pause\|resume}` | **Admin.** Job control for the tray and the status page. `all` pauses every enabled job and remembers which, so resuming doesn't wake the ones you had paused |
-| `GET /ui` (outside `/noskill/v1`) | The status page: static HTML, no token needed to load it; its calls carry the token ([ADR-0011](adr/0011-tray-and-status-page-over-http.md)) |
+| `GET /noskill/v1/downloads` | **Admin.** The Downloads and History tabs' data: whether ask-first is on, the downloads waiting for your yes and those you added, finished torrents not yet filed, recently filed files, and folder suggestions |
+| `POST /noskill/v1/downloads` | **Admin.** `{url, dest?, name?}`: add a download by hand (a magnet link, an https `.torrent` link or a Nyaa page; anything else is refused). Filed in `dest` when it finishes |
+| `POST /noskill/v1/downloads/file-now` | **Admin.** Stop finished downloads seeding and file them now |
+| `GET /ui` (outside `/noskill/v1`) | The status page: static HTML, no token needed to load it; its calls carry the token ([ADR-0011](adr/0011-tray-and-status-page-over-http.md)). Four tabs: **Overview** (jobs, skills, models, learning), **Approvals** (everything waiting for you), **Downloads** (planning ahead, finished downloads, add a download) and **History** (what was filed, what was asked and answered, recent runs). The address keeps the tab (`/ui#history`) |
 
 **Admin** means a `[[server.tokens]]` entry with `admin = true`, or the `local` client when no tokens are set. Admins also see every approval and may approve ones that need `exec`.
 

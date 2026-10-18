@@ -39,7 +39,7 @@ Rules:
 | `skill_versions` | `name`, `version`, `content_hash`, `parent_version`, `changelog`, `created_by` (user/learning/install), `created_at` |
 | `skill_stats` | `name`, `version`, `uses`, `successes`, `failures`, `skips`, `avg_steps`, `last_used_at` |
 | `skill_vectors` | `name`, `version`, `embed_model`, `vector` |
-| `skill_kv` | `skill`, `key`, `value` (json), `updated_at`: private storage per skill (watcher items, anime taste profile, rule ids) |
+| `skill_kv` | `skill`, `key`, `value` (json), `updated_at`: private storage per skill (watcher items, anime taste profile, rule ids; the anime tracker's `titles.<id>`, `plan.<id>` for downloads it asked about or you added by hand, and the folders it may write to) |
 
 ### Runs and learning
 | Table | Columns |

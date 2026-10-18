@@ -185,6 +185,7 @@ Config (config.toml):
   [skills.anime-tracker]
   client = "auto"                   # auto | transmission | qbittorrent; auto = Transmission first, qBittorrent only as a backup
   nyaa_url = "https://nyaa.si"      # https only; a mirror where nyaa.si is blocked
+  ask_before_download = "false"     # "true": ask about each new episode first (approval kind "download"); a no is remembered
   trusted_only = false              # Nyaa's trusted-uploader filter
   max_age = "2400h"                 # only uploads this recent (default 100 days)
   library_dirs = []                 # other folders where you keep anime: read to skip what you have

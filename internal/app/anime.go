@@ -208,6 +208,7 @@ func (a *App) AnimeTracker(ctx context.Context, dryRun bool) (*anime.Tracker, er
 			Lang:            a.animeString("title_language", "english"),
 			NotifyOnly:      a.animeString("mode", "approve") == "notify-only",
 			ReplaceVersions: a.animeString("replace_versions", "true") != "false",
+			AskFirst:        a.animeString("ask_before_download", "false") == "true",
 			Naming: anime.Naming{Preset: a.animeString("naming", "simple"),
 				Episodes:     strings.ToLower(a.animeString("episode_style", "sxxexx")),
 				TitleFolders: a.animeString("title_folders", "true") != "false",

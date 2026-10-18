@@ -86,6 +86,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /noskill/v1/events", s.events)
 	mux.HandleFunc("GET /noskill/v1/status", s.admin(s.status))
 	mux.HandleFunc("POST /noskill/v1/jobs/{id}/{action}", s.admin(s.jobAction))
+	mux.HandleFunc("GET /noskill/v1/downloads", s.admin(s.downloads))
+	mux.HandleFunc("POST /noskill/v1/downloads", s.admin(s.addDownload))
+	mux.HandleFunc("POST /noskill/v1/downloads/file-now", s.admin(s.fileNow))
 	mux.HandleFunc("GET /ui", s.ui)
 
 	return s.auth.Wrap(s.limitBody(mux))

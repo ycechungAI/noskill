@@ -72,6 +72,7 @@ type fakeTransmission struct {
 	torrents []map[string]any
 	removed  []string
 	stopped  []string
+	sets     []map[string]any  // torrent-set arguments, in order
 	names    map[string]string // torrent URL → release name
 }
 
@@ -99,6 +100,7 @@ func (f *fakeTransmission) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"labels": req.Arguments["labels"], "downloadDir": req.Arguments["download-dir"], "percentDone": 0.0})
 		args["torrent-added"] = map[string]any{"hashString": hash}
 	case "torrent-set":
+		f.sets = append(f.sets, req.Arguments)
 	case "torrent-stop":
 		f.stopped = append(f.stopped, req.Arguments["ids"].([]any)[0].(string))
 		for _, t := range f.torrents {

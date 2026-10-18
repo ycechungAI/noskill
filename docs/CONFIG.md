@@ -141,6 +141,7 @@ mode = "approve"                 # approve | notify-only (no automatic mode: eve
 default_destination = "/Volumes/RED/ANIME2026"   # prefilled in each approval; you can change it per title
 download_dir = "$DOWNLOADS"      # the torrent app downloads here first
 client = "auto"                  # auto | transmission | qbittorrent. auto = Transmission when it answers, qBittorrent only as a backup when it doesn't (`noskill anime detect` shows what's found)
+ask_before_download = "false"    # "true": each new episode waits for your yes (an approval, answered on the status page's Downloads tab, the tray or `noskill approvals`) before it is downloaded; a no is remembered
 nyaa_url = "https://nyaa.si"     # English-translated anime; https only; a mirror (e.g. https://nyaa.media) where it's blocked
 max_age = "2400h"                # only uploads this recent; only this season's new shows are suggested anyway
 library_dirs = []                # other anime folders: read only, so shows and episodes you have are skipped

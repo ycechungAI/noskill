@@ -140,7 +140,11 @@ func (t *Transmission) AddTorrent(ctx context.Context, torrentURL string) error 
 		return errors.New("Transmission already has this torrent")
 	}
 	if out.Added != nil { // older versions ignore labels on add
-		return t.call(ctx, "torrent-set", map[string]any{"ids": []string{out.Added.Hash}, "labels": []string{t.Label}}, nil)
+		// Stop seeding the moment the download completes: ratio limit 0 for this torrent (mode 1 = its
+		// own limit). Without it a finished torrent seeds until the user's global limit, or for ever,
+		// and only stops when a later filing run gets to it.
+		return t.call(ctx, "torrent-set", map[string]any{"ids": []string{out.Added.Hash}, "labels": []string{t.Label},
+			"seedRatioMode": 1, "seedRatioLimit": 0.0}, nil)
 	}
 	return nil
 }

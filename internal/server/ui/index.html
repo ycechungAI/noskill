@@ -38,6 +38,20 @@ code{font:12px ui-monospace,Menlo,Consolas,monospace}
 .fields{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;align-items:center;margin:6px 0 2px}
 .fields input{font:inherit;padding:3px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:100%}
 .fields input:invalid{border-color:var(--bad)}
+#tabs{display:flex;gap:4px;max-width:1100px;margin:0 auto;padding:0 16px;border-bottom:1px solid var(--line);overflow-x:auto}
+#tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;background:none;color:var(--mute);font-weight:550;white-space:nowrap}
+#tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--acc)}
+#tabs button:hover{border-color:transparent;border-bottom-color:var(--line)}
+.count{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:99px;background:var(--acc);color:#fff;font-size:11px;text-align:center}
+.count:empty{display:none}
+.tabpanel{display:none;grid-column:1/-1;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr))}
+.tabpanel.on{display:grid}
+p.lead{margin:0 0 8px;color:var(--mute)}
+.addf{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 10px;align-items:center}
+.addf input{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:100%}
+.addf input:focus-visible,button:focus-visible,#tabs button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;white-space:pre-wrap;font:12px ui-monospace,Menlo,Consolas,monospace}
+.path{font:12px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
 </style>
 </head>
 <body>
@@ -50,13 +64,43 @@ code{font:12px ui-monospace,Menlo,Consolas,monospace}
 </div>
 <div id="app" hidden>
 <header><h1>noskill</h1><span id="sub"></span><span style="flex:1"></span><span class="row"><button id="pauseall"></button></span></header>
+<nav id="tabs" role="tablist" aria-label="Pages">
+  <button role="tab" id="tab-overview" data-tab="overview" aria-controls="p-overview">Overview</button>
+  <button role="tab" id="tab-approvals" data-tab="approvals" aria-controls="p-approvals">Approvals<span class="count" id="cnt-approvals"></span></button>
+  <button role="tab" id="tab-downloads" data-tab="downloads" aria-controls="p-downloads">Downloads<span class="count" id="cnt-downloads"></span></button>
+  <button role="tab" id="tab-history" data-tab="history" aria-controls="p-history">History</button>
+</nav>
 <main>
-  <section class="wide" id="s-approvals"><h2>Waiting for you</h2><div id="approvals"></div></section>
-  <section id="s-jobs"><h2>Jobs</h2><div class="scroll" id="jobs"></div></section>
-  <section id="s-runs"><h2>Recent runs</h2><div class="scroll" id="runs"></div></section>
-  <section class="wide" id="s-models"><h2>Models</h2><div class="scroll" id="models"></div></section>
-  <section id="s-skills"><h2>Skills</h2><div class="scroll" id="skills"></div></section>
-  <section id="s-learning"><h2>Learning</h2><div class="scroll" id="learning"></div><h2 style="margin-top:14px">Evaluation</h2><div class="scroll" id="eval"></div></section>
+  <div class="tabpanel" id="p-overview" role="tabpanel" aria-labelledby="tab-overview">
+    <section id="s-jobs"><h2>Jobs</h2><div class="scroll" id="jobs"></div></section>
+    <section id="s-skills"><h2>Skills</h2><div class="scroll" id="skills"></div></section>
+    <section class="wide" id="s-models"><h2>Models</h2><div class="scroll" id="models"></div></section>
+    <section id="s-learning"><h2>Learning</h2><div class="scroll" id="learning"></div><h2 style="margin-top:14px">Evaluation</h2><div class="scroll" id="eval"></div></section>
+  </div>
+  <div class="tabpanel" id="p-approvals" role="tabpanel" aria-labelledby="tab-approvals">
+    <section class="wide" id="s-approvals"><h2>Waiting for you</h2>
+      <p class="lead">Questions noskill asks before it does something: add a show, download an episode, use a skill it learned. Answer here, in the tray, or with <code>noskill approvals</code>.</p>
+      <div id="approvals"></div></section>
+  </div>
+  <div class="tabpanel" id="p-downloads" role="tabpanel" aria-labelledby="tab-downloads">
+    <section class="wide"><h2>Planning ahead</h2><div id="dl-ask"></div><div id="dl-waiting"></div></section>
+    <section><h2>Finished, waiting to be filed</h2><div class="scroll" id="dl-finished"></div><div id="dl-filemsg"></div></section>
+    <section><h2>Add a download</h2>
+      <p class="lead">A magnet link, a link to a .torrent file, or a Nyaa page. It is filed in the folder you choose when it finishes, and stops seeding then.</p>
+      <form class="addf" id="addf" autocomplete="off">
+        <label for="add-url" class="mute">Link</label><input id="add-url" type="text" spellcheck="false" placeholder="magnet:?xt=urn:btih:… or https://…" required>
+        <label for="add-dest" class="mute">Save to</label><input id="add-dest" type="text" spellcheck="false" list="dl-folders" placeholder="a folder">
+        <datalist id="dl-folders"></datalist>
+        <label for="add-name" class="mute">Name</label><input id="add-name" type="text" placeholder="optional: the file name to keep (one file only)">
+        <span></span><span class="row"><button class="go" id="add-go" type="submit">Add download</button><span id="add-msg" role="status"></span></span>
+      </form></section>
+    <section class="wide"><h2>Added by you</h2><div class="scroll" id="dl-mine"></div></section>
+  </div>
+  <div class="tabpanel" id="p-history" role="tabpanel" aria-labelledby="tab-history">
+    <section class="wide"><h2>Filed</h2><div class="scroll" id="h-filed"></div></section>
+    <section><h2>Downloads and answers</h2><div class="scroll" id="h-plan"></div></section>
+    <section><h2>Recent runs</h2><div class="scroll" id="runs"></div></section>
+  </div>
 </main>
 </div>
 <script>
@@ -147,6 +191,9 @@ function render(d) {
   const typing = document.activeElement && document.activeElement.tagName === "INPUT" && $("approvals").contains(document.activeElement);
   if (!typing) put("approvals", s.approvals.length ? s.approvals.map(a => approval(a, s.volumes || [])) : empty("Nothing is waiting."));
 
+  const asking = s.approvals.length, askingDl = s.approvals.filter(a => a.kind === "download").length;
+  $("cnt-approvals").textContent = asking || "";
+  $("cnt-downloads").textContent = askingDl || "";
   put("jobs", table(["Job", "Schedule", "Next", "Last", ""], s.jobs.map(j => [
     j.name, el("code", {}, j.schedule),
     j.enabled ? ago(j.next) : chip("paused", "warn"),
@@ -181,6 +228,99 @@ function render(d) {
     ago(e.started_at), e.model, e.suite, e.passed + "/" + e.tasks])) || empty("No eval runs. Try noskill eval run."));
 }
 
+// ---- tabs (Overview, Approvals, Downloads, History) ----
+const TABS = ["overview", "approvals", "downloads", "history"];
+let tab = "", dl = null;
+function setTab(name, fromUser) {
+  if (!TABS.includes(name)) name = "overview";
+  tab = name;
+  for (const t of TABS) {
+    $("p-" + t).classList.toggle("on", t === name);
+    const b = $("tab-" + t);
+    b.setAttribute("aria-selected", t === name ? "true" : "false");
+    b.tabIndex = t === name ? 0 : -1;
+  }
+  if (fromUser) { try { history.replaceState(null, "", "#" + name); } catch (e) {} }
+  if (name === "downloads" || name === "history") loadDownloads();
+}
+for (const b of document.querySelectorAll("#tabs button")) {
+  b.onclick = () => setTab(b.dataset.tab, true);
+  b.onkeydown = e => { // arrow keys move between tabs
+    const i = TABS.indexOf(b.dataset.tab), d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (d) { const n = TABS[(i + d + TABS.length) % TABS.length]; setTab(n, true); $("tab-" + n).focus(); e.preventDefault(); }
+  };
+}
+const statusChip = s => chip(s, s === "filed" || s === "added" ? "ok" : s === "failed" ? "bad" : s === "asked" ? "warn" : "");
+const base = p => (p || "").split(/[\\/]/).filter(Boolean).pop() || p;
+function size(n) { return !n ? "" : n > 1e9 ? (n / 1e9).toFixed(1) + " GB" : (n / 1e6).toFixed(0) + " MB"; }
+
+async function loadDownloads() {
+  try {
+    const r = await api("/noskill/v1/downloads");
+    if (!r.ok) return;
+    dl = await r.json();
+    renderDownloads();
+    renderHistory();
+  } catch (e) { /* the status call reports a lost server */ }
+}
+
+function renderDownloads() {
+  if (!dl) return;
+  put("dl-ask", el("p", {class: "lead"}, dl.ask_first
+    ? ["Ask first is ", chip("on", "ok"), ": new episodes wait here for your yes before anything is downloaded."]
+    : ["Ask first is ", chip("off", "warn"), ": approved shows download as episodes appear. Turn it on with ", el("code", {}, "ask_before_download = \"true\""), " under ", el("code", {}, "[skills.anime-tracker]"), " in config.toml."]));
+  const asked = dl.items.filter(i => i.status === "asked" && i.approval_id);
+  put("dl-waiting", asked.length ? table(["Download", "Asked", ""], asked.map(i => [
+    el("span", {}, i.title, i.episode ? " " + i.episode : "", i.size_text || i.size ? el("span", {class: "mute"}, " · " + (i.size_text || size(i.size))) : null),
+    ago(i.created),
+    el("span", {class: "row"},
+      el("button", {class: "go", onclick: () => act("/noskill/v1/approvals/" + i.approval_id, {action: "approve"})}, "Download"),
+      el("button", {onclick: () => act("/noskill/v1/approvals/" + i.approval_id, {action: "skip"})}, "Skip"))])) : empty("Nothing is waiting for your yes."));
+
+  const f = dl.finished || [];
+  put("dl-finished", dl.problem && !dl.client ? el("div", {class: "warn"}, dl.problem) : f.length ? [
+    table(["Download", "Size", "Seeding", ""], f.map(x => [x.name, size(x.size), x.seeding ? chip("seeding", "warn") : chip("stopped", "ok"), ""])),
+    el("div", {class: "row", style: "margin-top:8px"}, el("button", {class: "go", id: "filenow", onclick: fileNow}, "Stop seeding and file now"))] : empty("Nothing finished is waiting."));
+
+  const dlist = $("dl-folders");
+  if (dlist && dlist.dataset.n !== String((dl.folders || []).length)) {
+    dlist.replaceChildren(...(dl.folders || []).map(p => el("option", {value: p})));
+    dlist.dataset.n = String((dl.folders || []).length);
+    if (!$("add-dest").value && dl.folders && dl.folders[0]) $("add-dest").placeholder = dl.folders[0];
+  }
+  const mine = dl.items.filter(i => i.kind === "manual");
+  put("dl-mine", table(["Added", "Download", "Folder", "Status"], mine.map(i => [
+    ago(i.created), i.title, el("span", {class: "path"}, i.destination || ""), [statusChip(i.status), i.note ? " " + i.note : ""]])) || empty("Nothing added yet."));
+}
+
+async function fileNow() {
+  const b = $("filenow"); if (b) b.disabled = true;
+  const r = await api("/noskill/v1/downloads/file-now", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"});
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  put("dl-filemsg", el("pre", {class: "msg"}, r.ok ? (j.text || "Done.") : ((j.error && j.error.message) || "Couldn't do that (" + r.status + ")")));
+  refresh();
+}
+
+$("addf").onsubmit = async e => {
+  e.preventDefault();
+  const msg = $("add-msg"), go = $("add-go");
+  go.disabled = true; msg.className = "mute"; msg.textContent = "adding…";
+  const r = await api("/noskill/v1/downloads", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({url: $("add-url").value, dest: $("add-dest").value, name: $("add-name").value})});
+  let j = {}; try { j = await r.json(); } catch (x) {}
+  go.disabled = false;
+  if (r.ok) { msg.className = "ok"; msg.textContent = "Added: " + (j.item && j.item.title || "download"); $("add-url").value = ""; $("add-name").value = ""; loadDownloads(); }
+  else { msg.className = "bad"; msg.textContent = (j.error && j.error.message) || "Couldn't add it (" + r.status + ")"; }
+};
+
+function renderHistory() {
+  if (!dl) return;
+  put("h-filed", table(["When", "Title", "Episode", "File"], (dl.filed || []).map(x => [
+    ago(x.at), x.title, x.episode || "", el("span", {class: "path", title: x.path}, base(x.path))])) || empty("Nothing filed yet."));
+  put("h-plan", table(["When", "Download", "Status"], (dl.items || []).map(i => [
+    ago(i.updated || i.created), [i.title, i.episode ? " " + i.episode : ""], [statusChip(i.status), i.kind === "manual" ? chip("you added it") : null]])) || empty("No downloads were asked about yet."));
+}
+
 let timer = 0;
 async function refresh() {
   clearTimeout(timer);
@@ -189,11 +329,17 @@ async function refresh() {
     if (r.status === 401) { $("app").hidden = true; $("login").style.display = "block"; return; }
     if (r.status === 403) { $("app").hidden = false; $("login").style.display = "none"; put("approvals", el("div", {class: "bad"}, "This token isn't an admin token. Add admin = true to it in [[server.tokens]].")); return; }
     $("login").style.display = "none"; $("app").hidden = false;
-    render(await r.json());
-    if (!shown && location.hash.startsWith("#a-")) { // opened from the tray's "Change…" item
-      const n = document.getElementById(location.hash.slice(1));
-      if (n) { n.scrollIntoView({block: "center"}); const i = n.querySelector("input"); if (i) i.focus(); }
+    const d = await r.json();
+    render(d);
+    if (!shown) { // first load: the tab in the address, else Approvals when something waits, else Overview
+      const h = location.hash.slice(1);
+      setTab(h.startsWith("a-") ? "approvals" : TABS.includes(h) ? h : (d.status.approvals || []).length ? "approvals" : "overview");
+      if (h.startsWith("a-")) { // opened from the tray's "Change…" item
+        const n = document.getElementById(h);
+        if (n) { n.scrollIntoView({block: "center"}); const i = n.querySelector("input"); if (i) i.focus(); }
+      }
     }
+    if (tab === "downloads" || tab === "history") loadDownloads();
     shown = true;
   } catch (e) {
     $("sub").textContent = "can't reach noskill: " + e.message;

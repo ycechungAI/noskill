@@ -795,3 +795,50 @@ func TestPresetModelNames(t *testing.T) {
 		t.Errorf("404 should list the preset names: %d %s", resp.StatusCode, body)
 	}
 }
+
+// The Downloads and History tabs: admin only, a clear message when there is no torrent app, and a
+// link that isn't a magnet, https .torrent or Nyaa page is refused before anything is added. The
+// tracker is told not to use any torrent app, so the test never touches one on this machine.
+func TestDownloadsEndpoints(t *testing.T) {
+	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {
+		c.Server.Tokens = []config.Token{{Name: "chat", Token: "secret:C"}, {Name: "tray", Token: "secret:T", Admin: true}}
+		c.Skills.Settings = map[string]map[string]any{"anime-tracker": {"client": "none", "ask_before_download": "true"}}
+	}, map[string]string{"C": "chat-token-0123456789", "T": "tray-token-0123456789"})
+	chat := map[string]string{"Authorization": "Bearer chat-token-0123456789"}
+	tray := map[string]string{"Authorization": "Bearer tray-token-0123456789"}
+
+	for _, c := range []struct{ method, path string }{{"GET", "/noskill/v1/downloads"}, {"POST", "/noskill/v1/downloads"}, {"POST", "/noskill/v1/downloads/file-now"}} {
+		if resp, _ := g.do(c.method, c.path, map[string]string{"url": "magnet:?xt=urn:btih:" + strings.Repeat("a", 40)}, nil); resp.StatusCode != 401 {
+			t.Errorf("%s %s without a token: %d", c.method, c.path, resp.StatusCode)
+		}
+		if resp, _ := g.do(c.method, c.path, map[string]string{"url": "x"}, chat); resp.StatusCode != 403 {
+			t.Errorf("%s %s for a chat token: %d", c.method, c.path, resp.StatusCode)
+		}
+	}
+	resp, body := g.do("GET", "/noskill/v1/downloads", nil, tray)
+	var v struct {
+		AskFirst bool            `json:"ask_first"`
+		Problem  string          `json:"problem"`
+		Items    json.RawMessage `json:"items"`
+		Finished json.RawMessage `json:"finished"`
+		Filed    json.RawMessage `json:"filed"`
+		Folders  json.RawMessage `json:"folders"`
+	}
+	if resp.StatusCode != 200 || json.Unmarshal(body, &v) != nil || !v.AskFirst || v.Problem == "" || string(v.Items) != "[]" || string(v.Finished) != "[]" || string(v.Filed) != "[]" {
+		t.Fatalf("GET downloads: %d %s", resp.StatusCode, body)
+	}
+	resp, body = g.do("POST", "/noskill/v1/downloads", map[string]string{"url": "magnet:?xt=urn:btih:" + strings.Repeat("a", 40)}, tray)
+	if resp.StatusCode != 400 || !strings.Contains(string(body), "no usable torrent app") {
+		t.Errorf("no torrent app: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ = g.do("POST", "/noskill/v1/downloads", map[string]string{"dest": "x"}, tray); resp.StatusCode != 400 {
+		t.Errorf("no link: %d", resp.StatusCode)
+	}
+	resp, body = g.do("POST", "/noskill/v1/downloads/file-now", nil, tray)
+	if resp.StatusCode != 400 || !strings.Contains(string(body), "no usable torrent app") {
+		t.Errorf("file now without a torrent app: %d %s", resp.StatusCode, body)
+	}
+	if _, page := g.do("GET", "/ui", nil, nil); !strings.Contains(string(page), `data-tab="history"`) || !strings.Contains(string(page), `id="addf"`) {
+		t.Error("the page lacks the tabs or the add form")
+	}
+}

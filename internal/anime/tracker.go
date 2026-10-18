@@ -54,6 +54,9 @@ type Settings struct {
 	// ReplaceVersions lets a fixed release (v2) of an episode noskill filed, at the same resolution,
 	// replace it: the old file goes to the OS trash first (SKILL.md "Rules").
 	ReplaceVersions bool
+	// AskFirst (ask_before_download) asks the user about each new release before it is downloaded
+	// (plan.go); without it releases of approved titles are added as they appear.
+	AskFirst bool
 }
 
 func (s Settings) withDefaults() Settings {
@@ -111,6 +114,7 @@ type Report struct {
 	Offered  []string `json:"offered,omitempty"`  // new titles sent for approval
 	Approved []string `json:"approved,omitempty"` // answered yes since the last run
 	Declined []string `json:"declined,omitempty"` // answered no or timed out
+	Planned  []string `json:"planned,omitempty"`  // downloads waiting for the user's yes (ask_before_download)
 	Added    []string `json:"added,omitempty"`    // torrents handed to the torrent app
 	Stopped  []string `json:"stopped,omitempty"`  // finished torrents stopped from seeding
 	Filed    []string `json:"filed,omitempty"`    // episodes renamed into the user's folders
@@ -131,7 +135,7 @@ func (r Report) String() string {
 	for _, s := range []struct {
 		name string
 		l    []string
-	}{{"Problems", r.Problems}, {"Offered for approval", r.Offered}, {"Approved", r.Approved}, {"Declined", r.Declined},
+	}{{"Problems", r.Problems}, {"Offered for approval", r.Offered}, {"Waiting for your yes", r.Planned}, {"Approved", r.Approved}, {"Declined", r.Declined},
 		{"Downloading", r.Added}, {"Stopped seeding", r.Stopped}, {"Filed", r.Filed}, {"Skipped", r.Skipped}} {
 		if len(s.l) == 0 {
 			continue
@@ -700,6 +704,15 @@ func (t *Tracker) download(ctx context.Context, lib Library, rep *Report) error 
 				continue
 			}
 			line := fmt.Sprintf("%s (%s)", label, pick.rel.Resolution)
+			planKey := ReleaseKey(ts.Title, k)
+			if v := pick.rel.Version; v > 1 {
+				planKey += fmt.Sprintf(" v%d", v)
+			}
+			if yes, err := t.ask(ctx, rep, PlanItem{Kind: "release", Key: planKey, Title: ts.Title, Episode: k, Name: pick.item.Title, SizeText: pick.item.Size, URL: pick.item.TorrentURL}); err != nil {
+				return err
+			} else if !yes {
+				continue
+			}
 			if t.DryRun {
 				rep.Added = append(rep.Added, line+" (dry run)")
 				continue
@@ -708,6 +721,7 @@ func (t *Tracker) download(ctx context.Context, lib Library, rep *Report) error 
 				rep.Problems = append(rep.Problems, fmt.Sprintf("%s: %v", label, err))
 				continue
 			}
+			t.planAdded(ctx, planKey)
 			if ts.Fallback == nil {
 				ts.Fallback = map[string]string{}
 			}
@@ -814,6 +828,10 @@ func (t *Tracker) file(ctx context.Context, lib Library, rep *Report) error {
 	if err != nil {
 		return err
 	}
+	plans, err := t.State.Plans(ctx)
+	if err != nil {
+		return err
+	}
 	if t.Only != "" {
 		found := slices.ContainsFunc(done, func(tor Torrent) bool { return strings.EqualFold(tor.Hash, t.Only) })
 		done = slices.DeleteFunc(done, func(tor Torrent) bool { return !strings.EqualFold(tor.Hash, t.Only) })
@@ -833,6 +851,13 @@ func (t *Tracker) file(ctx context.Context, lib Library, rep *Report) error {
 			default:
 				rep.Stopped = append(rep.Stopped, tor.Name)
 			}
+		}
+		if item, ok := manualFor(plans, tor.Hash); ok {
+			// A download the user added: every file goes to the folder they chose.
+			if placed, all := t.fileManual(ctx, tor, item, rep); all {
+				t.removeAndTrash(ctx, tor, placed, rep)
+			}
+			continue
 		}
 		if t.State.Ignored(ctx, tor.Hash) {
 			continue
@@ -984,34 +1009,40 @@ func (t *Tracker) file(ctx context.Context, lib Library, rep *Report) error {
 		if filed == 0 || unplaced > 0 || t.DryRun {
 			continue // a file it couldn't place stays in the download, and so does the torrent
 		}
-		if err := t.Client.RemoveTorrent(ctx, tor.Hash); err != nil {
-			rep.Problems = append(rep.Problems, fmt.Sprintf("%s: %v", tor.Name, err))
-			continue
-		}
-		content := tor.ContentPath
-		if content == "" {
-			content = filepath.Join(tor.SavePath, tor.Name)
-		}
-		// Only a download with a folder or file of its own goes to the trash as a whole. A torrent
-		// made without a folder (qBittorrent's "don't create subfolder") reports the download
-		// folder itself as its content, and that must never be trashed: only the videos placed are.
-		// A single-file torrent's own path is gone once its file was renamed; the renamed one is
-		// the download then.
-		victims := placed
-		if _, err := os.Lstat(content); err == nil && strictlyInside(tor.SavePath, content) {
-			victims = []string{content}
-		}
-		for _, v := range victims {
-			if _, err := os.Lstat(v); err != nil {
-				continue
-			}
-			if err := t.Files.TrashPath(ctx, v); err != nil {
-				rep.Problems = append(rep.Problems, fmt.Sprintf("filed %s but couldn't move the download to the trash: %v", tor.Name, err))
-				break
-			}
-		}
+		t.removeAndTrash(ctx, tor, placed, rep)
 	}
 	return nil
+}
+
+// removeAndTrash takes a filed download out of the torrent app (its files stay) and moves what was
+// stored from to the trash.
+func (t *Tracker) removeAndTrash(ctx context.Context, tor Torrent, placed []string, rep *Report) {
+	if err := t.Client.RemoveTorrent(ctx, tor.Hash); err != nil {
+		rep.Problems = append(rep.Problems, fmt.Sprintf("%s: %v", tor.Name, err))
+		return
+	}
+	content := tor.ContentPath
+	if content == "" {
+		content = filepath.Join(tor.SavePath, tor.Name)
+	}
+	// Only a download with a folder or file of its own goes to the trash as a whole. A torrent
+	// made without a folder (qBittorrent's "don't create subfolder") reports the download
+	// folder itself as its content, and that must never be trashed: only the videos placed are.
+	// A single-file torrent's own path is gone once its file was renamed; the renamed one is
+	// the download then.
+	victims := placed
+	if _, err := os.Lstat(content); err == nil && strictlyInside(tor.SavePath, content) {
+		victims = []string{content}
+	}
+	for _, v := range victims {
+		if _, err := os.Lstat(v); err != nil {
+			continue
+		}
+		if err := t.Files.TrashPath(ctx, v); err != nil {
+			rep.Problems = append(rep.Problems, fmt.Sprintf("filed %s but couldn't move the download to the trash: %v", tor.Name, err))
+			break
+		}
+	}
 }
 
 // strictlyInside reports whether p is below base (not base itself, not outside it).
