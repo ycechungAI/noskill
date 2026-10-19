@@ -21,6 +21,8 @@ $script:dry = $false
 
 # key|group|title|what it runs ({} = the words you type; @ = a source-tree task)|what to ask for|default
 $table = @'
+install|Setup|Build and install noskill (and Go, Ollama, models if missing)|@install||
+ollama|Setup|Install Ollama if missing and download the recommended models|@ollama||
 ui|Use|Status page: approvals, downloads, history|ui||
 approvals|Use|What is waiting for your yes|approvals||
 run|Use|Run one task|run {}|What should noskill do?|
@@ -97,12 +99,147 @@ function PickBin([string[]]$words) {
   SourceBin
 }
 
+# Does this computer have Go? If not, offer the official build from go.dev in %LOCALAPPDATA%\Programs\go
+# (NOSKILL_GO_DIR to change it): no admin, SHA-256 checked against dl.google.com, folder added to your
+# user PATH. On success `go` is on PATH for the rest of this script.
+function EnsureGo([bool]$yes) {
+  if (Get-Command go -ErrorAction SilentlyContinue) { return $true }
+  $gd = if ($env:NOSKILL_GO_DIR) { $env:NOSKILL_GO_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\go" }
+  if (Test-Path (Join-Path $gd "bin\go.exe")) { $env:Path = "$gd\bin;$env:Path"; return $true }
+  $arch = Arch
+  if (-not $arch) { [Console]::Error.WriteLine("install Go yourself: https://go.dev/dl/"); return $false }
+  $ver = ((Invoke-WebRequest "https://go.dev/VERSION?m=text" -UseBasicParsing).Content -split "`r?`n")[0].Trim()
+  if ($ver -notmatch "^go1\.") { [Console]::Error.WriteLine("couldn't find the current Go version; install Go yourself: https://go.dev/dl/"); return $false }
+  if (-not (AskYes $yes "Go isn't installed. Download $ver (about 80 MB, from go.dev, checksum checked) into ${gd}?" $false)) { [Console]::Error.WriteLine("not installed; get Go from https://go.dev/dl/ and run this again"); return $false }
+  if (Test-Path $gd) { [Console]::Error.WriteLine("$gd exists but has no bin\go.exe; move it away or set NOSKILL_GO_DIR"); return $false }
+  $file = "$ver.windows-$arch.zip"
+  $gt = Join-Path ([IO.Path]::GetTempPath()) ("noskill-go-" + [Guid]::NewGuid().ToString("N"))
+  New-Item -ItemType Directory -Path $gt | Out-Null
+  try {
+    [Console]::Error.WriteLine("downloading $file ...")
+    $want = ((Invoke-WebRequest "https://dl.google.com/go/$file.sha256" -UseBasicParsing).Content -split "\s+")[0].Trim()
+    if (-not (FetchChecked "https://dl.google.com/go/$file" (Join-Path $gt $file) $want)) { return $false }
+    Expand-Archive (Join-Path $gt $file) -DestinationPath $gt -Force
+    New-Item -ItemType Directory -Path (Split-Path $gd) -Force | Out-Null
+    Move-Item (Join-Path $gt "go") $gd
+  } finally { Remove-Item $gt -Recurse -Force -ErrorAction SilentlyContinue }   # our own scratch folder
+  AddUserPath "$gd\bin"
+  [Console]::Error.WriteLine("installed Go ($ver) in $gd and added it to your user PATH (open a new terminal to use it yourself)")
+  return $true
+}
+
+function Arch {
+  if ($env:PROCESSOR_ARCHITEW6432 -eq "ARM64") { return "arm64" }
+  switch ($env:PROCESSOR_ARCHITECTURE) { "AMD64" { "amd64" } "ARM64" { "arm64" } default { $null } }
+}
+function AddUserPath([string]$dir) {
+  $env:Path = "$dir;$env:Path"
+  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+  if (($userPath -split ";") -notcontains $dir) { [Environment]::SetEnvironmentVariable("Path", ($(if ($userPath) { "$userPath;" } else { "" }) + $dir), "User") }
+}
+# AskYes <skip> <question> <defaultYes>: ask on the terminal; false when it can't ask.
+function AskYes([bool]$skip, [string]$q, [bool]$def) {
+  if ($skip) { return $true }
+  if ([Console]::IsInputRedirected) { return $false }
+  $a = Read-Host ($q + $(if ($def) { " [Y/n]" } else { " [y/N]" }))
+  if ($def) { return ($a -notin "n", "N", "no") } else { return ($a -in "y", "Y", "yes") }
+}
+# FetchChecked <url> <file> <sha256>: download, then refuse anything that doesn't match the checksum.
+function FetchChecked([string]$url, [string]$file, [string]$sha) {
+  Invoke-WebRequest $url -OutFile $file -UseBasicParsing
+  $got = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+  if (-not $sha -or $got -ne $sha.ToLower()) { [Console]::Error.WriteLine("the download doesn't match its checksum; nothing was installed"); return $false }
+  return $true
+}
+function OllamaExe {
+  $c = Get-Command ollama -ErrorAction SilentlyContinue
+  if ($c) { return $c.Source }
+  $p = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
+  if (Test-Path $p) { return $p }
+}
+
+# Is Ollama installed? If not, offer to install it (Ollama's own installer, SHA-256 and signature
+# checked, per-user) and start it; then offer the models noskill recommends for this much memory.
+# Models are fetched one at a time and skipped when already there.
+function SetupOllama([bool]$yes) {
+  $ob = OllamaExe
+  if (-not $ob) {
+    $rel = "https://github.com/ollama/ollama/releases/latest/download"
+    if (-not (AskYes $yes "Ollama isn't installed. Download its installer (about 1.5 GB, from ollama.com's GitHub release, checksum and signature checked) and run it for you only?" $false)) {
+      [Console]::Error.WriteLine("not installed; get Ollama from https://ollama.com/download and run this again"); return $false
+    }
+    $sums = (Invoke-WebRequest "$rel/sha256sum.txt" -UseBasicParsing).Content -split "`r?`n"
+    $want = (($sums | Where-Object { $_ -match "\./OllamaSetup\.exe$" } | Select-Object -First 1) -split "\s+")[0]
+    $ot = Join-Path ([IO.Path]::GetTempPath()) ("noskill-ollama-" + [Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $ot | Out-Null
+    try {
+      $setup = Join-Path $ot "OllamaSetup.exe"
+      if (-not (FetchChecked "$rel/OllamaSetup.exe" $setup $want)) { return $false }
+      $sig = Get-AuthenticodeSignature $setup
+      if ($sig.Status -ne "Valid") { [Console]::Error.WriteLine("the installer's signature isn't valid ($($sig.Status)); nothing was installed"); return $false }
+      Start-Process $setup -ArgumentList "/SILENT" -Wait
+    } finally { Remove-Item $ot -Recurse -Force -ErrorAction SilentlyContinue }   # our own scratch folder
+    $ob = OllamaExe
+    if (-not $ob) { [Console]::Error.WriteLine("Ollama didn't install where expected; get it from https://ollama.com/download"); return $false }
+    [Console]::Error.WriteLine("installed Ollama: $ob")
+  }
+  for ($i = 0; $i -lt 40; $i++) { & $ob list *> $null; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 2 }
+  if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("Ollama isn't answering yet: start it, then run this again to fetch the models"); return $false }
+  $gb = [int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+  $have = (& $ob list) | Select-Object -Skip 1 | ForEach-Object { ($_ -split "\s+")[0] }
+  $want = if ($gb -ge 8) { @("granite4:3b", "gemma3:1b") } else { [Console]::Error.WriteLine("This computer has about $gb GB of memory, so only the small model (gemma3:1b) is suggested."); @("gemma3:1b") }
+  $todo = @($want | Where-Object { $have -notcontains $_ })
+  if ($todo.Count -eq 0) { [Console]::Error.WriteLine("the recommended models are already installed ($($want -join ' '))") }
+  elseif (AskYes $yes "Download the recommended models: $($todo -join ' ') (granite4:3b about 2 GB = main, gemma3:1b about 0.8 GB = backup)?" $true) {
+    foreach ($m in $todo) { [Console]::Error.WriteLine("-> ollama pull $m"); & $ob pull $m; if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("couldn't fetch ${m}: try  ollama pull $m  later") } }
+  }
+  if ($gb -ge 12 -and $have -notcontains "qwen3.5:4b" -and (AskYes $false "Also download qwen3.5:4b (about 4 GB), the slower, stronger model for hard tasks?" $false)) { & $ob pull "qwen3.5:4b" }
+  return $true
+}
+
+# Build this source tree and install it for the current user (no admin), then offer `noskill init`.
+# It goes to %LOCALAPPDATA%\Programs\noskill (NOSKILL_INSTALL_DIR to change it). `-y` after the name skips the questions.
+# Go and Ollama are fetched first if missing, then the recommended models; each step asks first.
+function InstallNoskill([string[]]$more) {
+  $yes = $more -contains "-y"
+  $dir = if ($env:NOSKILL_INSTALL_DIR) { $env:NOSKILL_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\noskill" }
+  $exe = Join-Path $dir "noskill.exe"
+  if ($script:dry) { "(in $here) go build -o $exe ./cmd/noskill, then: $exe init"; return 0 }
+  if (-not $yes) {
+    if ([Console]::IsInputRedirected) { [Console]::Error.WriteLine("run it from a terminal, or add -y:  .\start.cmd install -y"); return 2 }
+    $a = Read-Host "Build noskill and install it to $exe (replaces one already there)? [y/N]"
+    if ($a -notin "y", "Y", "yes") { [Console]::Error.WriteLine("not installed"); return 0 }
+  }
+  if (-not (EnsureGo $yes)) { return 1 }
+  New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  $new = "$exe.new"
+  Push-Location $here
+  try { $env:CGO_ENABLED = "0"; go build -o $new ./cmd/noskill; if ($LASTEXITCODE -ne 0) { return 1 } } finally { Remove-Item Env:CGO_ENABLED -ErrorAction SilentlyContinue; Pop-Location }
+  if (Test-Path $exe) { Remove-Item "$exe.old" -Force -ErrorAction SilentlyContinue; Move-Item $exe "$exe.old" -Force }   # a running exe can be renamed, not overwritten
+  Move-Item $new $exe
+  [Console]::Error.WriteLine("installed $exe")
+  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+  if (($userPath -split ";") -notcontains $dir) {
+    [Environment]::SetEnvironmentVariable("Path", ($(if ($userPath) { "$userPath;" } else { "" }) + $dir), "User")
+    [Console]::Error.WriteLine("added $dir to your user PATH: open a new terminal to use noskill")
+  }
+  if (-not (SetupOllama $yes)) { [Console]::Error.WriteLine("Ollama and the models can be set up later:  .\start.cmd ollama") }
+  $a = if ($yes) { "y" } else { Read-Host 'Run "noskill init" now (finds Ollama and your models, writes a starting config)? [Y/n]' }
+  if ($a -in "n", "N", "no") { [Console]::Error.WriteLine("run it later with: noskill init") } else { & $exe init; return $LASTEXITCODE }
+  return 0
+}
+
 function RunItem([string]$key, [string[]]$more) {
   $it = $items | Where-Object { $_.Key -eq $key }
   if (-not $it) { [Console]::Error.WriteLine("no item called '$key'. .\start.cmd --list shows them."); return 2 }
   $tpl = $it.Tpl
   switch -Regex ($tpl) {
     "^@readme$" { Get-Content (Join-Path $here "docs\START.md"); return 0 }
+    "^@install$" { return (InstallNoskill $more) }
+    "^@ollama$" {
+      if ($script:dry) { "check for Ollama (install it if missing), then ollama pull the recommended models"; return 0 }
+      if (SetupOllama ($more -contains "-y")) { return 0 } else { return 1 }
+    }
     "^@vet$" {
       foreach ($t in "darwin/arm64", "darwin/amd64", "linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64") {
         $os, $arch = $t -split "/"

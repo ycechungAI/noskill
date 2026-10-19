@@ -18,6 +18,30 @@ The installed one (`noskill` on your PATH, or `NOSKILL_BIN`). If that one doesn'
 
 ## Items
 
+## Setup
+
+### install
+
+Build and install noskill on this computer, and everything it needs that is missing. In order, each step asking first (`./start.sh install -y` agrees to all of them except the optional 4 GB model):
+
+1. **Go**, if it isn't installed: the official build from go.dev (about 70 MB), SHA-256 checked, into `~/.local/go` or `%LOCALAPPDATA%\Programs\go`. No sudo or admin.
+2. **noskill**: builds this source tree into `~/.local/bin` (macOS, Linux) or `%LOCALAPPDATA%\Programs\noskill` (Windows); `NOSKILL_INSTALL_DIR` chooses another folder. It asks before replacing an installed noskill and is separate from the background service's copy in `~/.noskill/bin`. On Windows it adds the folder to your user `PATH`; on macOS and Linux it prints the line to add.
+3. **Ollama** and the **models**: see the next item.
+4. `noskill init`, which finds your backends and models and writes a starting config.
+
+Runs: `go build -o <folder>/noskill ./cmd/noskill`, then `noskill init`
+
+### ollama
+
+Install Ollama if it is missing and download the recommended models. It looks for `ollama` on your PATH and in the usual app folders. If it isn't there it offers to install it, per user and with the checksum checked: the macOS app into `~/Applications` (about 210 MB), the Linux build into `~/.local` (about 1.5 GB, needs `zstd`, no sudo), or on Windows Ollama's own installer (about 1.5 GB, its signature checked too). Then it starts Ollama, waits for it and offers the models noskill recommends for this much memory:
+
+- **8 GB or more:** `granite4:3b` (about 2 GB, the main model: tools, about 9 seconds a task) and `gemma3:1b` (about 0.8 GB, the backup for plain tasks).
+- **Under 8 GB:** `gemma3:1b` only.
+- **12 GB or more:** it also asks about `qwen3.5:4b` (about 4 GB, slower and stronger), default no.
+
+Models already installed are skipped and they are fetched one at a time. `./start.sh ollama -y` agrees without asking.
+
+Runs: `ollama pull <model>` for each
 
 ## Use
 

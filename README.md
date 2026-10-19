@@ -2,6 +2,21 @@
 
 > Your local model starts with no skills. It learns them.
 
+## Install
+No release is published yet, so for now you install from a clone (the repo is private, so `git` must be signed in to GitHub, e.g. `gh auth login`). The installer builds noskill, and first installs **Go**, **Ollama** and the recommended models (`granite4:3b`, `gemma3:1b`) if they are missing, asking before each download.
+
+**macOS / Linux**
+```bash
+git clone https://github.com/ycechungAI/noskill && cd noskill && ./start.sh install
+```
+
+**Windows (PowerShell)**
+```powershell
+git clone https://github.com/ycechungAI/noskill; cd noskill; .\start.cmd install
+```
+
+Open a new terminal afterwards (and add `~/.local/bin` to your `PATH` on macOS/Linux if it says so). Then `noskill ui` opens the status page, and `./start.sh` (Windows: `start.cmd`) is a menu of everyday commands ([guide](docs/START.md)). `./start.sh ollama` does just the Ollama-and-models part. To do it by hand: `CGO_ENABLED=0 go build -o <folder>/noskill ./cmd/noskill && noskill init`. Once a release exists, `scripts/install.sh` (macOS/Linux) and `scripts/install.ps1` (Windows) will download, verify and install it for you ([PACKAGING.md](docs/PACKAGING.md)).
+
 noskill is a planned runtime that gives **local models** (Ollama, LM Studio, llama.cpp, MLX or any OpenAI-compatible server) **skills**: web search, research, files, running code, scheduled jobs. It also lets them **learn new skills** from their own runs. It's one binary for macOS, Windows and Linux, written in Go, MIT licensed.
 
 > **Status: Phase 3 and in use on macOS.** The runtime, learning loop, skill optimisation, scheduler, anime-tracker, signed skill registry and an opt-in LoRA pipeline are built and tested on macOS against a real Ollama. Linux and Windows build and vet cleanly but haven't been run on real machines. No release, installer or website is published yet; the GitHub org, signing key and domain are decided last ([PACKAGING.md](docs/PACKAGING.md)). This repo also holds the spec, the design docs and the Phase 0 test harness (`spikes/`, Python).
