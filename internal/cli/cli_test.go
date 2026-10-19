@@ -1159,3 +1159,63 @@ func TestHookNeedsAKnownNameAndAHash(t *testing.T) {
 		}
 	}
 }
+
+// `noskill ui` serves the page when nothing is running, opens it on the tab asked for, and just
+// opens the running one the second time (no second server).
+func TestUIStartsPageAndReusesRunningServer(t *testing.T) {
+	h := newHarness(t)
+	port := freePort(t)
+	var opened []string
+	var mu sync.Mutex
+	was := openURL
+	openURL = func(_ context.Context, u string) error { mu.Lock(); opened = append(opened, u); mu.Unlock(); return nil }
+	defer func() { openURL = was }()
+
+	var errb safeBuffer
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan int, 1)
+	env := func(e *safeBuffer) Env {
+		return Env{Stdin: strings.NewReader(""), Stdout: &safeBuffer{}, Stderr: e, Environ: []string{}, Version: "test", StdinFD: -1,
+			Keychain: h.kc, Notifier: quiet{}, Trash: trashTo{h.trash}, Getwd: func() (string, error) { return t.TempDir(), nil },
+			Context: func() (context.Context, context.CancelFunc) { return context.WithCancel(ctx) }}
+	}
+	go func() { done <- Main([]string{"--home", h.home, "ui", "downloads", "--port", fmt.Sprint(port)}, env(&errb)) }()
+
+	want := fmt.Sprintf("http://127.0.0.1:%d/ui#downloads", port)
+	for i := 0; i < 100; i++ {
+		mu.Lock()
+		n := len(opened)
+		mu.Unlock()
+		if n > 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	mu.Lock()
+	if len(opened) != 1 || opened[0] != want {
+		t.Fatalf("opened %v, want [%s]\n%s", opened, want, errb.String())
+	}
+	mu.Unlock()
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/ui", port))
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("page: %v %v", resp, err)
+	}
+	resp.Body.Close()
+
+	var errb2 safeBuffer
+	if code := Main([]string{"--home", h.home, "ui", "history", "--port", fmt.Sprint(port)}, env(&errb2)); code != 0 || !strings.Contains(errb2.String(), "already serving") {
+		t.Errorf("second ui: %d %s", code, errb2.String())
+	}
+	mu.Lock()
+	if len(opened) != 2 || !strings.HasSuffix(opened[1], "/ui#history") {
+		t.Errorf("opened %v", opened)
+	}
+	mu.Unlock()
+	if code := Main([]string{"--home", h.home, "ui", "nope"}, env(&errb2)); code != ExitUsage {
+		t.Errorf("bad tab: %d", code)
+	}
+	cancel()
+	if code := <-done; code != 0 {
+		t.Errorf("exit %d\n%s", code, errb.String())
+	}
+}

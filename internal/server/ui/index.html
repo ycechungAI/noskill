@@ -250,6 +250,7 @@ for (const b of document.querySelectorAll("#tabs button")) {
     if (d) { const n = TABS[(i + d + TABS.length) % TABS.length]; setTab(n, true); $("tab-" + n).focus(); e.preventDefault(); }
   };
 }
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.includes(h) && h !== tab) setTab(h); }); // ./ask.sh on a page that is already open
 const statusChip = s => chip(s, s === "filed" || s === "added" ? "ok" : s === "failed" ? "bad" : s === "asked" ? "warn" : "");
 const base = p => (p || "").split(/[\\/]/).filter(Boolean).pop() || p;
 function size(n) { return !n ? "" : n > 1e9 ? (n / 1e9).toFixed(1) + " GB" : (n / 1e6).toFixed(0) + " MB"; }

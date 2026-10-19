@@ -32,7 +32,7 @@ func TestBuildLinks(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, p := range []string{"docs/VISION.md", "docs/CLI.md", "docs/CONFIG.md", "docs/SKILL_AUTHORING.md", "docs/SKILL_FORMAT.md", "docs/LEARNING.md",
+	for _, p := range []string{"docs/START.md", "docs/VISION.md", "docs/CLI.md", "docs/CONFIG.md", "docs/SKILL_AUTHORING.md", "docs/SKILL_FORMAT.md", "docs/LEARNING.md",
 		"skills/README.md", "docs/ARCHITECTURE.md", "docs/ORCHESTRATOR.md", "docs/MODEL_ADAPTERS.md", "docs/PROXY.md", "docs/SECURITY.md", "docs/PLATFORMS.md",
 		"docs/DATA_MODEL.md", "SPEC.md", "docs/ROADMAP.md", "docs/PACKAGING.md", "docs/OPEN_QUESTIONS.md", "docs/PRIOR_ART.md", "docs/PHASE0_TESTS.md"} {
 		write(p, "# "+p+"\n")
@@ -51,7 +51,7 @@ func TestBuildLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 20+11+3 {
+	if n != 21+11+3 {
 		t.Errorf("%d pages", n)
 	}
 	if len(problems) != 1 || !strings.Contains(problems[0], "docs/CLI.md") || !strings.Contains(problems[0], "nope.md") {

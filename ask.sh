@@ -12,6 +12,8 @@
 # answer here is picked up by the daemon, and "Add a download" / "Stop seeding and file now" act
 # on your torrent app straight away.
 #
+# Running it again stops its earlier server and starts one from the current source.
+#
 # Settings (environment):
 #   NOSKILL_HOME      the noskill folder to use          (default ~/.noskill)
 #   NOSKILL_UI_PORT   the port for the page              (default 11436)
@@ -36,11 +38,22 @@ open_page() {
   fi
 }
 
-# Already serving on this port (an earlier ./ask.sh)? Just open it.
+# An earlier ./ask.sh still serving on this port runs the code it was built from, so it would
+# miss anything added since (a new skill, a new tab). Stop that one (only a server this script
+# started, found by its recorded process ID) and start fresh. Anything else on the port is left alone.
+pidfile="${TMPDIR:-/tmp}/noskill-ask-$port.pid"
+if [ -f "$pidfile" ]; then
+  old=$(cat "$pidfile" 2>/dev/null || true)
+  if [ -n "$old" ] && ps -p "$old" -o command= 2>/dev/null | grep -q "noskill-ask\..*serve --no-jobs"; then
+    echo "stopping the earlier ask.sh server ($old) so this one runs the current source"
+    kill "$old" 2>/dev/null || true
+    sleep 1
+  fi
+  rm -f "$pidfile"
+fi
 if curl -sf -m 2 "http://127.0.0.1:$port/" >/dev/null 2>&1; then
-  echo "noskill is already answering on port $port: $url"
-  open_page
-  exit 0
+  echo "port $port is used by something that isn't an ask.sh server; set NOSKILL_UI_PORT to another port" >&2
+  exit 1
 fi
 
 command -v go >/dev/null 2>&1 || { echo "ask.sh builds from source and needs Go (https://go.dev/dl/)" >&2; exit 1; }
@@ -48,6 +61,7 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/noskill-ask.XXXXXX")
 pid=""
 cleanup() {
   [ -n "$pid" ] && kill "$pid" 2>/dev/null || true   # only the server this script started
+  rm -f "$pidfile"
   rm -rf "$tmp"                                       # our own scratch folder
 }
 trap cleanup EXIT
@@ -58,6 +72,7 @@ echo "building noskill from $here …"
 
 "$tmp/noskill" --home "$home" serve --no-jobs --port "$port" &
 pid=$!
+echo "$pid" > "$pidfile"
 
 i=0
 until curl -sf -m 2 "http://127.0.0.1:$port/" >/dev/null 2>&1; do

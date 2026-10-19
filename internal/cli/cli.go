@@ -110,6 +110,7 @@ func init() {
 		{"config", "get, set, edit or check config.toml", cmdConfig},
 		{"secrets", "store API keys and tokens in the OS keychain", cmdSecrets},
 		{"serve", "run the OpenAI- and Ollama-compatible server", cmdServe},
+		{"ui", "open the status page: approvals, downloads, history (starts a page-only server if none is running)", cmdUI},
 		{"daemon", "install and control the background service", cmdDaemon},
 		{"update", "check for a new version and install it", cmdUpdate},
 		{"uninstall", "remove the service and the binary noskill installed", cmdUninstall},

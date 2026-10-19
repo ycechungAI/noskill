@@ -17,7 +17,10 @@ noskill is a planned runtime that gives **local models** (Ollama, LM Studio, lla
 Design target: half of a 16 GB machine. Models get 6 GB (a 3B–4B chat model next to a small decision model) and grow toward ~10.7 GB only while the rest of the machine is free ([ADR-0012](docs/adr/0012-shared-machine-6gb-budget-with-burst.md)).
 
 ## Commands
+Not sure where to start? `./start.sh` (Windows: `start.cmd`) is a menu of the everyday commands, with `--help`; the guide is [docs/START.md](docs/START.md).
+
 ```bash
+noskill ui                   # the status page: approvals, downloads, history
 noskill init                 # find backends and models, benchmark them
 noskill run "research the best NAS for Plex under $500 and cite sources"
 noskill skills list          # built-in and learned skills, with success rates

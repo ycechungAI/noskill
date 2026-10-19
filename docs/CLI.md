@@ -118,6 +118,7 @@ Built in block 5c (FR-S10, [ADR-0016](adr/0016-signed-skill-registry.md)). A reg
 
 | Command | Does |
 |---|---|
+| `noskill ui [overview\|approvals\|downloads\|history] [--port N] [--no-open]` | Open the status page on a tab. If the daemon or a `noskill serve` is answering, that page opens; otherwise a page-and-API server with no scheduled jobs starts and runs until Ctrl-C. Same on macOS, Windows and Linux (replaces `ask.sh` / `ask.ps1` once the installed noskill has it). `start.sh` / `start.cmd` is a menu of everyday commands: [START.md](START.md) |
 | `noskill serve` | Foreground server (the daemon runs this too) on `127.0.0.1:11435`: OpenAI-compatible `/v1/*`, Ollama-compatible `/api/*` (same layout as Ollama on 11434, so apps just change the port), status page `/ui`. Flags: `--port`, `--lan --token <t>` to expose beyond localhost, `--no-jobs` (page and API only: no scheduled jobs, learning or approval sweeps run in this process, so a second server can sit next to the daemon; `ask.sh` uses it). Setup per chat app: [PROXY.md](PROXY.md) |
 
 ## Example session
