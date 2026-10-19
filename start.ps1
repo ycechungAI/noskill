@@ -207,7 +207,7 @@ function InstallNoskill([string[]]$more) {
   if ($script:dry) { "(in $here) go build -o $exe ./cmd/noskill, then: $exe init"; return 0 }
   if (-not $yes) {
     if ([Console]::IsInputRedirected) { [Console]::Error.WriteLine("run it from a terminal, or add -y:  .\start.cmd install -y"); return 2 }
-    $a = Read-Host "Build noskill and install it to $exe (replaces one already there)? [y/N]"
+    $a = Read-Host ("Build noskill and install it to $exe" + $(if (Test-Path $exe) { " (replaces the one already there)" } else { "" }) + "? [y/N]")
     if ($a -notin "y", "Y", "yes") { [Console]::Error.WriteLine("not installed"); return 0 }
   }
   if (-not (EnsureGo $yes)) { return 1 }

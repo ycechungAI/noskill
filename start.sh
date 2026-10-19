@@ -235,7 +235,7 @@ install_noskill() {
   if [ "$dry" = 1 ]; then echo "(in $here) go build -o $dir/noskill ./cmd/noskill, then: $dir/noskill init"; return; fi
   if [ "$yes" = 0 ]; then
     [ -t 0 ] || { echo "run it from a terminal, or add -y:  ./start.sh install -y" >&2; return 2; }
-    printf 'Build noskill and install it to %s/noskill (replaces one already there)? [y/N] ' "$dir" >&2
+    printf 'Build noskill and install it to %s/noskill%s? [y/N] ' "$dir" "$([ -e "$dir/noskill" ] && echo ' (replaces the one already there)')" >&2
     IFS= read -r a || a=n
     case "$a" in y|Y|yes) ;; *) echo "not installed" >&2; return 0 ;; esac
   fi
