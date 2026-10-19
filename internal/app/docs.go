@@ -33,7 +33,12 @@ func (a *App) Docs(ctx context.Context) (*docs.Index, error) {
 	return a.docs, nil
 }
 
-func (s *runServices) DocsIndex(ctx context.Context) (*docs.Index, error) { return s.a.Docs(ctx) }
+func (s *runServices) DocsIndex(ctx context.Context) (*docs.Index, error) {
+	if s.docs != nil {
+		return s.docs, nil
+	}
+	return s.a.Docs(ctx)
+}
 
 // ExpandPath resolves ~, $HOME-style tokens and volume:<label>/… to a real path.
 func (a *App) ExpandPath(p string) (string, error) { return a.resolver().Expand(p) }

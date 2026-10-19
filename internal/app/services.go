@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 
 	"noskill/internal/backends"
+	"noskill/internal/docs"
 	"noskill/internal/orchestrator"
 	"noskill/internal/tools"
 	"noskill/internal/volumes"
@@ -43,6 +44,7 @@ type runServices struct {
 	a           *App
 	runID       string
 	model       Model
+	docs        *docs.Index // an eval task's own documents; nil = the user's index
 	delegations atomic.Int32
 	delegated   atomic.Pointer[string] // the model the last delegation ran on (swap rule 8)
 }

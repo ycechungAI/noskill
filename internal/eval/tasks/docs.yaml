@@ -1,0 +1,111 @@
+# local-docs tasks: the model answers from a small folder of documents that is added and indexed for
+# the one run (keyword search, a temporary index). Found answers must give the value and cite the
+# file; questions the files can't answer must say so instead of guessing. Nothing here touches the
+# user's own index, the OS trash or the network.
+- id: docs-01
+  type: docs
+  skills: [local-docs]
+  prompt: "What is the hotel confirmation code for my Lisbon trip?"
+  docs:
+    trip-notes.md: "# Lisbon trip\n\n## Flights\nTAP flight TP 205 leaves Boston on 14 March.\n\n## Hotel\nHotel Alfama Light, 4 nights, confirmation code LX-88213.\n"
+    recipes.txt: "Pancakes: flour, milk, eggs. Fry in butter."
+  tools: [docs_search]
+  check: { contains: [lx-88213, trip-notes] }
+- id: docs-02
+  type: docs
+  skills: [local-docs]
+  prompt: "How long are database backups kept, and in which bucket?"
+  docs:
+    runbook.md: "# Runbook\n\n## Restarting the API\nRun systemctl restart api-gateway on host nova-2.\n\n## Backups\nBackups run nightly at 01:15 and are kept 14 days in the bucket acme-backups.\n"
+    ideas.txt: "Build a bird feeder camera. Learn sourdough."
+  tools: [docs_search]
+  check: { contains: ["14", acme-backups, runbook] }
+- id: docs-03
+  type: docs
+  skills: [local-docs]
+  prompt: "Who do I escalate to when nobody answers the on-call phone?"
+  docs:
+    runbook.md: "# Runbook\n\n## On call\nThe on-call phone is 555-0142. Escalate to Priya after 20 minutes without an answer.\n"
+    holidays.md: "# Holidays\nOffice closed 25 December."
+  tools: [docs_search]
+  check: { contains: [priya, runbook] }
+- id: docs-04
+  type: docs
+  skills: [local-docs]
+  prompt: "When do I want to plant the tomatoes?"
+  docs:
+    ideas.txt: "Ideas: build a bird feeder camera; learn to bake sourdough; plant tomatoes in May."
+    shopping.txt: "Milk, rice, lemons."
+  tools: [docs_search]
+  check: { contains: [may, ideas] }
+- id: docs-05
+  type: docs
+  skills: [local-docs]
+  prompt: "What is the wifi password at my office?"
+  docs:
+    trip-notes.md: "# Lisbon trip\n\n## Hotel\nHotel Alfama Light, confirmation code LX-88213.\n"
+    runbook.md: "# Runbook\n\n## Backups\nBackups run nightly at 01:15.\n"
+  tools: [docs_search]
+  check: { any: ["didn't find", "did not find", "couldn't find", "could not find", "no mention", "not mentioned", "not in your", "not found", "doesn't", "does not", "don't have"], not: ["password is", "the password:"] }
+- id: docs-06
+  type: docs
+  skills: [local-docs]
+  prompt: "What was the budget for the offsite, and who books the venue?"
+  docs:
+    offsite.md: "# Offsite plan\n\n## Budget\nThe offsite budget is 8,500 euros.\n\n## Venue\nMarta books the venue.\n"
+    standup.md: "# Standup\nDaily at 9:30."
+  tools: [docs_search]
+  check: { contains: ["8,500", marta, offsite] }
+- id: docs-07
+  type: docs
+  skills: [local-docs]
+  prompt: "In my notes, what is the name of the contractor who fixed the roof?"
+  docs:
+    house.md: "# House\n\n## Repairs\nThe roof was fixed in June by contractor Dalia Okafor, invoice 4471.\n\n## Garden\nWater the beans twice a week.\n"
+  tools: [docs_search]
+  check: { contains: [okafor, house] }
+- id: docs-08
+  type: docs
+  skills: [local-docs]
+  prompt: "Which port does the staging server listen on?"
+  docs:
+    infra.md: "# Infra\n\n## Servers\nProduction listens on port 443. Staging listens on port 8443.\n"
+    notes.txt: "Remember to renew the domain in November."
+  tools: [docs_search]
+  check: { contains: ["8443", infra] }
+- id: docs-09
+  type: docs
+  skills: [local-docs]
+  prompt: "Do my documents say when the lease ends?"
+  docs:
+    house.md: "# House\n\n## Repairs\nThe roof was fixed in June.\n"
+    budget.md: "# Budget\nRent is 1,200 a month."
+  tools: [docs_search]
+  check: { any: ["didn't find", "did not find", "couldn't find", "could not find", "no mention", "not mentioned", "not found", "doesn't mention", "does not mention", "doesn't say", "does not say", "don't say", "not say", "no information"], not: ["lease ends on", "lease ends in"] }
+- id: docs-10
+  type: docs
+  skills: [local-docs]
+  family: docs-lookup
+  prompt: "Which flight am I taking back, and on what date?"
+  docs:
+    travel.md: "# Travel\n\n## Outbound\nTP 205 on 14 March.\n\n## Return\nReturn flight TP 208 on 21 March.\n"
+  tools: [docs_search]
+  check: { contains: ["208", "21", travel] }
+- id: docs-11
+  type: docs
+  skills: [local-docs]
+  family: docs-lookup
+  prompt: "What time do nightly backups run?"
+  docs:
+    ops.md: "# Ops\n\n## Backups\nNightly backups run at 02:40.\n\n## Deploys\nDeploys go out on Tuesdays.\n"
+  tools: [docs_search]
+  check: { contains: ["02:40", ops] }
+- id: docs-12
+  type: docs
+  skills: [local-docs]
+  family: docs-lookup
+  prompt: "What is the Wi-Fi guest network called in the office notes?"
+  docs:
+    office.md: "# Office\n\n## Wi-Fi\nThe guest network is called Birchwood-Guest.\n\n## Printers\nThe printer is on the second floor.\n"
+  tools: [docs_search]
+  check: { contains: [office], regex: ['(?i)birchwood.{0,3}guest'] } # models write the hyphen as U+2011 now and then

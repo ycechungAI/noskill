@@ -14,6 +14,7 @@ import (
 
 	"noskill/internal/agent"
 	"noskill/internal/backends"
+	"noskill/internal/docs"
 	"noskill/internal/eval"
 	"noskill/internal/ids"
 	"noskill/internal/learning"
@@ -225,6 +226,15 @@ func (a *App) evalTaskWith(ctx context.Context, model string, t eval.Task, learn
 				res.Why = err.Error()
 				return res, ""
 			}
+		}
+		if len(t.Docs) > 0 {
+			ix, err := evalDocs(ctx, t.Docs)
+			if err != nil {
+				res.Why = err.Error()
+				return res, ""
+			}
+			defer ix.cleanup()
+			req.docs = ix.Index
 		}
 		prompt = strings.ReplaceAll(prompt, "{dir}", filepath.ToSlash(dir))
 		req.Skills = t.Skills
@@ -497,4 +507,45 @@ func clipText(s string, n int) string {
 		s = s[:n] + "…"
 	}
 	return s
+}
+
+// evalDocsIndex is a task's own documents: a temporary folder, added to a temporary index (keyword
+// search only, so a score doesn't depend on which embedding model is installed).
+type evalDocsIndex struct {
+	*docs.Index
+	cleanup func()
+}
+
+func evalDocs(ctx context.Context, files map[string]string) (*evalDocsIndex, error) {
+	root, err := os.MkdirTemp("", "noskill-eval-docs-")
+	if err != nil {
+		return nil, err
+	}
+	fail := func(err error) (*evalDocsIndex, error) { os.RemoveAll(root); return nil, err }
+	if r, err := filepath.EvalSymlinks(root); err == nil {
+		root = r
+	}
+	folder := filepath.Join(root, "docs")
+	for name, body := range files {
+		p := filepath.Join(folder, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			return fail(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			return fail(err)
+		}
+	}
+	ix, err := docs.Open(ctx, filepath.Join(root, "docs.db"))
+	if err != nil {
+		return fail(err)
+	}
+	if err := ix.AddFolder(ctx, folder); err != nil {
+		ix.Close()
+		return fail(err)
+	}
+	if _, err := ix.IndexFolder(ctx, folder); err != nil {
+		ix.Close()
+		return fail(err)
+	}
+	return &evalDocsIndex{Index: ix, cleanup: func() { ix.Close(); os.RemoveAll(root) }}, nil
 }

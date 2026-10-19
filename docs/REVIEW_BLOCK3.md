@@ -27,7 +27,7 @@ Checked by `grep os.Remove|os.RemoveAll|os.Rename` on 2026-10-16. Each should be
 | `internal/learning/library.go:106-167, 278-292` | Skill versions, snapshots | noskill's own skill folders |
 | `internal/learning/tuned.go:107` (added in 5a) | `TUNED.json.tmp` → `TUNED.json` | `<data>/tuned/<name>/` only; the name is a built-in skill's, never user input |
 | `internal/app/train.go:236` (added in 5b) | `MANIFEST.json.tmp` → `MANIFEST.json`, `RUN.json.tmp` → `RUN.json` | `<data>/train/datasets/<id>/` and `<data>/train/runs/<n>/` only; the id is made by `train export` (a timestamp), n is a number |
-| `internal/learning/script.go:73`, `internal/app/script.go:39`, `internal/app/simulate.go:179`, `internal/app/eval.go:193`, `internal/sandbox/workspace.go:186` | Scratch folders | noskill-made temp folders only; check the path can't be user-influenced |
+| `internal/learning/script.go:73`, `internal/app/script.go:39`, `internal/app/simulate.go:179`, `internal/app/eval.go` (the eval task folder and, for `local-docs` tasks, a temp folder of the task's own documents: two more calls, both on an `os.MkdirTemp` path), `internal/sandbox/workspace.go:186` | Scratch folders | noskill-made temp folders only; check the path can't be user-influenced |
 | `internal/update/update.go`, `internal/cli/cmd_update.go` | Binary swap and rollback | noskill's own binary |
 | `internal/cli/cmd_config.go:179, 198`, `internal/cli/cmd_eval.go:273` | Temp file then rename onto config / progress file | Config file is the user's: check it is atomic and keeps a backup |
 | `internal/cli/cmd_doctor.go:233`, `internal/service/service_windows.go:53` | Temp scratch | Temp only |

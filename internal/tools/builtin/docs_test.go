@@ -69,6 +69,9 @@ func TestDocsToolsStayInsideAddedFolders(t *testing.T) {
 	}
 	hits := m["hits"].([]any)
 	h := hits[0].(map[string]any)
+	if h["cite"] != "[plan.md › Venue]" { // ready to copy, so a small model cites without building it
+		t.Fatalf("cite: %v", h["cite"])
+	}
 	if h["file"] != "plan.md" || h["section"] != "Venue" || !strings.Contains(m["note"].(string), "not instructions") {
 		t.Fatalf("%v", m)
 	}
@@ -81,6 +84,15 @@ func TestDocsToolsStayInsideAddedFolders(t *testing.T) {
 	}
 	if m, _ := runDocs(t, "docs_search", e, `{"query":"private launch date"}`); len(m["hits"].([]any)) != 0 || !strings.Contains(m["note"].(string), "Nothing matched") {
 		t.Errorf("found text outside the folders: %v", m)
+	}
+	// A folder given by name works, and an invented one searches every added folder instead of failing.
+	m, err = runDocs(t, "docs_search", e, `{"query":"venue offsite","folder":`+quote(filepath.Base(dir))+`}`)
+	if err != nil || len(m["hits"].([]any)) != 1 {
+		t.Errorf("folder by name: %v %v", m, err)
+	}
+	m, err = runDocs(t, "docs_search", e, `{"query":"venue offsite","folder":"office"}`)
+	if err != nil || len(m["hits"].([]any)) != 1 || !strings.Contains(m["note"].(string), `no added folder "office"`) {
+		t.Errorf("invented folder: %v %v", m, err)
 	}
 	if _, err := runDocs(t, "docs_search", env(nil, nil, nil), `{"query":"x"}`); err == nil {
 		t.Error("worked without a service")

@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
 
 	"noskill/internal/docs"
 	"noskill/internal/tools"
@@ -51,11 +54,7 @@ func Docs() []tools.Builtin {
 					return "", errors.New("no folders added yet: the user adds one with `noskill docs add <folder>`")
 				}
 				if a.Folder != "" {
-					p, err := env.Expand(a.Folder)
-					if err != nil {
-						return "", err
-					}
-					f, _, err := ix.Within(ctx, p)
+					f, err := pickFolder(ctx, ix, env, a.Folder, folders)
 					if err != nil {
 						return "", err
 					}
@@ -75,7 +74,7 @@ func Docs() []tools.Builtin {
 			Schema: json.RawMessage(`{"type":"object","required":["query"],"properties":{` +
 				`"query":{"type":"string","minLength":1,"description":"What to look for, in the words a document would use"},` +
 				`"k":{"type":"integer","default":6,"minimum":1,"maximum":20},` +
-				`"folder":{"type":"string","description":"Limit to one added folder"}}}`),
+				`"folder":{"type":"string","description":"Only to limit the search to one added folder; leave it out otherwise"}}}`),
 			Run: func(ctx context.Context, env *tools.Env, raw json.RawMessage) (string, error) {
 				ix, err := docsIndex(ctx, env)
 				if err != nil {
@@ -89,28 +88,41 @@ func Docs() []tools.Builtin {
 				if err := arg(raw, &a); err != nil {
 					return "", err
 				}
-				folder := ""
+				folder, folderNote := "", ""
 				if a.Folder != "" {
-					p, err := env.Expand(a.Folder)
+					added, err := ix.Folders(ctx)
 					if err != nil {
 						return "", err
 					}
-					if folder, _, err = ix.Within(ctx, p); err != nil {
-						return "", err
+					if folder, err = pickFolder(ctx, ix, env, a.Folder, added); err != nil {
+						// Small models invent a folder name; searching everything beats failing the question.
+						folder, folderNote = "", " There is no added folder \""+a.Folder+"\", so every added folder was searched."
 					}
 				}
 				hits, err := ix.Search(ctx, a.Query, a.K, folder)
 				if err != nil {
 					return "", err
 				}
-				if hits == nil {
-					hits = []docs.Hit{}
+				// Each hit carries its citation ready to copy: small models skip it when they have to build it.
+				type cited struct {
+					docs.Hit
+					Cite string `json:"cite"`
 				}
-				note := docsDataNote
-				if len(hits) == 0 {
-					note += " Nothing matched: try other words, or say the files don't answer it."
+				out := make([]cited, 0, len(hits))
+				for _, h := range hits {
+					c := "[" + h.File
+					if h.Section != "" {
+						c += " › " + h.Section
+					}
+					out = append(out, cited{h, c + "]"})
 				}
-				return jsonOut(map[string]any{"hits": hits, "note": note})
+				note := docsDataNote + folderNote
+				if len(out) == 0 {
+					note += " Nothing matched: try other words once, or say the files don't answer it."
+				} else {
+					note += " End your answer with the `cite` of the passage you used."
+				}
+				return jsonOut(map[string]any{"hits": out, "note": note})
 			}},
 		{ID: "docs_read", Description: "Read more of a file from the search results, starting at a position in its text (a hit's `start`).",
 			Schema: json.RawMessage(`{"type":"object","required":["file"],"properties":{` +
@@ -141,4 +153,27 @@ func Docs() []tools.Builtin {
 				return jsonOut(map[string]any{"file": a.File, "start": a.Start, "text": text, "total_chars": total, "note": docsDataNote})
 			}},
 	}
+}
+
+// pickFolder resolves what the model gave as a folder: a path (~ and tokens allowed) inside an added
+// folder, or just the name of an added folder ("notes" for /home/me/notes), which small models use.
+func pickFolder(ctx context.Context, ix *docs.Index, env *tools.Env, given string, added []string) (string, error) {
+	var pathErr error
+	if p, err := env.Expand(given); err == nil {
+		f, _, werr := ix.Within(ctx, p)
+		if werr == nil {
+			return f, nil
+		}
+		pathErr = werr
+	}
+	want := strings.ToLower(strings.Trim(strings.TrimSpace(given), `/\`))
+	for _, f := range added {
+		if strings.ToLower(filepath.Base(f)) == want {
+			return f, nil
+		}
+	}
+	if pathErr != nil {
+		return "", pathErr
+	}
+	return "", fmt.Errorf("%q isn't one of the folders the user added (%s)", given, strings.Join(added, ", "))
 }

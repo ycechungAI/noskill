@@ -17,6 +17,7 @@ import (
 	"noskill/internal/approvals"
 	"noskill/internal/backends"
 	"noskill/internal/config"
+	"noskill/internal/docs"
 	"noskill/internal/ids"
 	"noskill/internal/orchestrator"
 	"noskill/internal/perms"
@@ -64,6 +65,9 @@ type RunRequest struct {
 	// without asking (eval tasks in their own temporary folder; the broker still checks paths).
 	plusLearned bool
 	autoConfirm bool
+	// docs, when set, is the document index the run's docs tools use in place of the user's own
+	// (eval tasks that carry their own documents).
+	docs *docs.Index
 	// OnStart is called once the plan is made and the run exists, before any model output.
 	OnStart func(runID, model string, skills []string)
 
@@ -559,7 +563,7 @@ func (a *App) Run(ctx context.Context, req RunRequest) (*RunResult, error) {
 	}
 
 	// Tools.
-	svc := &runServices{a: a, runID: runID, model: p.pick}
+	svc := &runServices{a: a, runID: runID, model: p.pick, docs: req.docs}
 	exec := a.executor(runID, p, req, svc)
 	owner = map[string]string{}
 	for _, r := range exec.Offered {

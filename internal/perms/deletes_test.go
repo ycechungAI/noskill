@@ -15,7 +15,7 @@ import (
 // call, or a changed count, fails this test until someone has looked at what it can reach and
 // updated the list here and the table in the review.
 var reviewedDeletes = map[string]int{
-	"internal/app/eval.go":                1,
+	"internal/app/eval.go":                3,
 	"internal/app/script.go":              1,
 	"internal/app/simulate.go":            1,
 	"internal/app/undo.go":                2,
