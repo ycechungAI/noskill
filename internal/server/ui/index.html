@@ -69,6 +69,7 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
   <button role="tab" id="tab-approvals" data-tab="approvals" aria-controls="p-approvals">Approvals<span class="count" id="cnt-approvals"></span></button>
   <button role="tab" id="tab-downloads" data-tab="downloads" aria-controls="p-downloads">Downloads<span class="count" id="cnt-downloads"></span></button>
   <button role="tab" id="tab-history" data-tab="history" aria-controls="p-history">History</button>
+  <button role="tab" id="tab-spikes" data-tab="spikes" aria-controls="p-spikes">Spikes</button>
 </nav>
 <main>
   <div class="tabpanel" id="p-overview" role="tabpanel" aria-labelledby="tab-overview">
@@ -126,6 +127,13 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
     <section class="wide"><h2>Filed</h2><div class="scroll" id="h-filed"></div></section>
     <section><h2>Downloads and answers</h2><div class="scroll" id="h-plan"></div></section>
     <section><h2>Recent runs</h2><div class="scroll" id="runs"></div></section>
+  </div>
+  <div class="tabpanel" id="p-spikes" role="tabpanel" aria-labelledby="tab-spikes">
+    <section class="wide" id="s-spikes"><h2>Phase 0 spikes</h2>
+      <p class="lead" style="margin-top:0">The live progress page of the Phase 0 experiments and their written results. Both are served by <code>./web.sh</code> (the docs site on port 8767, the spike status on 8765); if a frame stays empty, start it in a terminal.</p>
+      <div class="row" id="spike-pick" role="group" aria-label="What to show" style="margin-bottom:8px"></div>
+      <iframe id="spike-frame" title="Phase 0 spikes" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:8px;background:#fff" referrerpolicy="no-referrer"></iframe>
+      <p class="mute" style="margin:6px 0 0"><a id="spike-open" target="_blank" rel="noopener">Open in its own tab ↗</a></p></section>
   </div>
 </main>
 </div>
@@ -337,8 +345,32 @@ async function loadTasks() {
   } catch (e) { /* the status call reports a lost server */ }
 }
 
-// ---- tabs (Overview, Approvals, Downloads, History) ----
-const TABS = ["overview", "approvals", "downloads", "history"];
+// ---- Spikes: the Phase 0 spike status and results, served by ./web.sh on two local ports ----
+const SPIKE_HOST = location.hostname === "localhost" ? "localhost" : "127.0.0.1";
+const SPIKE_VIEWS = [
+  ["Live status", "http://" + SPIKE_HOST + ":8765/"],
+  ["Go / no-go", "http://" + SPIKE_HOST + ":8767/docs/spikes/PHASE0_GO_NO_GO.html"],
+  ["S1 tool calling", "http://" + SPIKE_HOST + ":8767/docs/spikes/S1-results.html"],
+  ["S2 proxy", "http://" + SPIKE_HOST + ":8767/docs/spikes/S2-results.html"],
+  ["S3 decision models", "http://" + SPIKE_HOST + ":8767/docs/spikes/S3-results.html"],
+  ["S4 memory", "http://" + SPIKE_HOST + ":8767/docs/spikes/S4-results.html"],
+  ["S5 Hermes", "http://" + SPIKE_HOST + ":8767/docs/spikes/S5-results.html"],
+  ["S7 daemon", "http://" + SPIKE_HOST + ":8767/docs/spikes/S7-results.html"],
+  ["S9 sandbox", "http://" + SPIKE_HOST + ":8767/docs/spikes/S9-results.html"]];
+let spikeView = -1;
+function showSpike(i) {
+  spikeView = i;
+  $("spike-frame").src = SPIKE_VIEWS[i][1];
+  $("spike-open").href = SPIKE_VIEWS[i][1];
+  for (const [j, b] of [...$("spike-pick").children].entries()) b.className = j === i ? "go" : "";
+}
+function initSpikes() {
+  if ($("spike-pick").children.length) return;
+  SPIKE_VIEWS.forEach(([name], i) => $("spike-pick").append(el("button", {type: "button", onclick: () => showSpike(i)}, name)));
+}
+
+// ---- tabs (Overview, Approvals, Downloads, History, Spikes) ----
+const TABS = ["overview", "approvals", "downloads", "history", "spikes"];
 let tab = "", dl = null;
 function setTab(name, fromUser) {
   if (!TABS.includes(name)) name = "overview";
@@ -351,6 +383,7 @@ function setTab(name, fromUser) {
   }
   if (fromUser) { try { history.replaceState(null, "", "#" + name); } catch (e) {} }
   if (name === "downloads" || name === "history") loadDownloads();
+  if (name === "spikes") { initSpikes(); if (spikeView < 0) showSpike(0); }
 }
 for (const b of document.querySelectorAll("#tabs button")) {
   b.onclick = () => setTab(b.dataset.tab, true);

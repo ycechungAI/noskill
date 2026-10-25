@@ -206,3 +206,12 @@ Runs: `readme`
 ## Adding an item
 
 Add one line to the table in `start.sh` **and** the same line to `start.ps1`, then a `###` section here. A test fails if the two tables differ or an item has no section.
+
+## The local web pages: `./web.sh`
+
+One command serves the docs site (<http://127.0.0.1:8767/>, built from the Markdown) and the Phase 0 spike status
+(<http://127.0.0.1:8765/>). The noskill status page has a **Spikes** tab (`/ui#spikes`) that shows the live spike status
+and the written results of each spike (S1 to S9, the go / no-go) in a frame, so they sit beside Jobs and Models; the docs
+site links back to the live status in its top bar. Ctrl-C stops the servers `web.sh` started and nothing else. `--no-build`
+serves the site already in `site/`; `--open` opens the pages. It needs python3, and Go to build the site. Windows: run
+`go run ./scripts/docsite` and `python spikes/status/server.py` yourself.

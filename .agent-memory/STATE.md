@@ -54,3 +54,6 @@ _Last updated: 2026-10-24 by Claude Code_
 - Status page: Brief section (digest + reminders box) between Skills and Models; endpoints `/noskill/v1/brief`,
   `/noskill/v1/reminders`. Housekeeping eval suite `internal/eval/tasks/chores.yaml` (11 tasks; granite4:3b scores
   8-10 of 11 run to run; tidy-01/tidy-02/rename-01 are the flaky ones). Eval tasks can now set `aged_days` and put files in subfolders.
+- `./web.sh`: serves the docs site (8767) and the Phase 0 spike status (8765) in one run; the noskill status page has a
+  Spikes tab that frames both (CSP `frame-src` allows only those two local ports). No web.ps1 yet.
+- internal/deepresearch (the deep-research pipeline) is written and tested but not yet wired to a skill/tool/CLI/status page.

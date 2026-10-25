@@ -10,7 +10,7 @@ const pageHTML = `<!doctype html>
 <link rel="stylesheet" href="%s">
 </head>
 <body>
-<header class="top"><a class="brand" href="%s">noskill</a><span class="tag">Your local model starts with no skills. It learns them.</span><a class="jump" href="#pages">Pages ↓</a></header>
+<header class="top"><a class="brand" href="%s">noskill</a><span class="tag">Your local model starts with no skills. It learns them.</span><a class="jump" href="#pages">Pages ↓</a><a class="jump" href="http://127.0.0.1:8765/" title="The Phase 0 spike status page; start it with ./web.sh">Live spike status ↗</a></header>
 <div class="wrap">
 <nav class="side" id="pages" aria-label="Pages">
 %s</nav>
