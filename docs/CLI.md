@@ -78,7 +78,7 @@ Built in block 5c (FR-S10, [ADR-0016](adr/0016-signed-skill-registry.md)). A reg
 
 | Command | Does |
 |---|---|
-| `noskill schedule add <skill|"prompt"> --cron "<expr>" | --every <dur>` | Flags: `--when volume:<label>`, `--when ac-power`, `--when unmetered`, `--when window:22:00-06:00` (repeatable; all must hold), `--missed skip|once`, `--timeout`, `--notify os,ntfy` |
+| `noskill schedule add <skill|"prompt"> --cron "<expr>" | --every <dur>` | Flags: `--when volume:<label>`, `--when ac-power`, `--when unmetered`, `--when window:22:00-06:00` (repeatable; all must hold), `--missed skip|once`, `--timeout`, `--notify os,ntfy`. Target `anime:<stages>` (`anime:all`, `anime:download,file`) runs the anime tracker's stages directly, with no model, so it needs no Ollama and takes seconds; it takes no `--prompt` or `--model` |
 | `noskill schedule list` / `pause|resume|rm|run <job>` | |
 | `noskill jobs` / `jobs stop <id|--all>` | Running jobs and kill switch |
 | `noskill approvals` | Pending items: id, source (job/skill/learning), what, expires |

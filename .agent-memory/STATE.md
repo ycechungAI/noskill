@@ -31,3 +31,12 @@ _Last updated: 2026-10-24 by Claude Code_
   no tools) instead. `llama3.2` was already tried and dropped (3/10 on checked `files` tasks).
 - Any binary that runs scripts must call `platform.MaybeRunSandboxChild()` first in `main`
   (ADR-0008) — easy to forget when adding a new `cmd/` entry point.
+
+## Update 2026-10-25
+
+- `orchestrator.exclude` and the status-page model actions / Add-a-job form are committed and live.
+- New job kind `anime` (`noskill schedule add anime:download,file ...`): the scheduler runs the
+  anime tracker's stages directly with no model (`Jobs.animeRun`, FR-J1). The live `anime-nightly`
+  and `anime-follow` jobs use it (a model-driven follow run took 13 min and wandered; this takes ~10 s).
+- Gotcha: a rebuilt `~/.noskill/bin/noskill` is a new binary to Little Snitch and to Full Disk
+  Access: its Nyaa calls fail with "connect: bad file descriptor" until the user allows it again.

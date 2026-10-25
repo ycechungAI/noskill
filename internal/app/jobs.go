@@ -46,12 +46,36 @@ func (x Jobs) request(j scheduler.Job) (RunRequest, error) {
 }
 
 func (x Jobs) Start(ctx context.Context, j scheduler.Job) scheduler.Result {
+	if j.TargetKind == "anime" {
+		return x.animeRun(ctx, j)
+	}
 	req, err := x.request(j)
 	if err != nil {
 		return scheduler.Result{Status: "failed", Err: err}
 	}
 	res, err := x.A.Run(ctx, req)
 	return jobResult(res, err)
+}
+
+// animeRun runs the tracker's stages itself, with no model: the tracker is plain code, and a small
+// model driving it only added minutes and wrong turns (a run took 13 minutes where the stages
+// take seconds). The job's target is the stage list, "all" or e.g. "download,file".
+func (x Jobs) animeRun(ctx context.Context, j scheduler.Job) scheduler.Result {
+	t, err := x.A.AnimeTracker(ctx, false)
+	if err != nil {
+		return jobResult(nil, err)
+	}
+	var out []string
+	for _, st := range strings.Split(j.Target, ",") {
+		rep, err := t.Run(ctx, st)
+		if err != nil {
+			return jobResult(nil, err)
+		}
+		if s := strings.TrimSpace(rep.String()); s != "" {
+			out = append(out, s)
+		}
+	}
+	return scheduler.Result{Status: "done", Summary: summarize(strings.Join(out, " "), 280)}
 }
 
 func (x Jobs) Resume(ctx context.Context, j scheduler.Job, jr scheduler.JobRun) scheduler.Result {

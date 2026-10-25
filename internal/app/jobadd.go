@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"noskill/internal/anime"
 	"noskill/internal/scheduler"
 )
 
@@ -104,7 +105,16 @@ func (a *App) AddJob(ctx context.Context, in JobSpec) (scheduler.Job, error) {
 	if target == "" {
 		return bad("say what to run: a skill name, or a prompt written as a sentence")
 	}
-	if s, ok := a.Skills.Get(target); ok {
+	if rest, ok := strings.CutPrefix(target, "anime:"); ok {
+		stages, err := animeStages(rest)
+		if err != nil {
+			return bad("%v", err)
+		}
+		j.TargetKind, j.Target = "anime", strings.Join(stages, ",")
+		if in.Prompt != "" || in.Model != "" {
+			return bad("an anime job runs the tracker directly, with no model, so it takes no task or model")
+		}
+	} else if s, ok := a.Skills.Get(target); ok {
 		j.TargetKind, j.Target = "skill", s.Name
 		if s.NeedsApproval() {
 			return bad("skill %s comes from a project folder; review and `noskill skills enable %s` first", s.Name, s.Name)
@@ -138,8 +148,11 @@ func (a *App) AddJob(ctx context.Context, in JobSpec) (scheduler.Job, error) {
 
 // JobName makes a short name from the target: the skill name, or the prompt's first words.
 func JobName(j scheduler.Job) string {
-	if j.TargetKind == "skill" {
+	switch j.TargetKind {
+	case "skill":
 		return j.Target
+	case "anime":
+		return "anime-" + strings.ReplaceAll(j.Target, ",", "-")
 	}
 	var words []string
 	for _, w := range strings.Fields(strings.ToLower(j.Target)) {
@@ -156,4 +169,23 @@ func JobName(j scheduler.Job) string {
 		n = "job"
 	}
 	return n
+}
+
+// animeStages checks a stage list for an anime job: "all", or stages from the tracker's own list.
+func animeStages(s string) ([]string, error) {
+	var out []string
+	for _, st := range strings.Split(s, ",") {
+		if st = strings.TrimSpace(st); st != "" {
+			out = append(out, st)
+		}
+	}
+	if len(out) == 0 {
+		out = []string{"all"}
+	}
+	for _, st := range out {
+		if st != "all" && !slices.Contains(anime.Stages, st) {
+			return nil, fmt.Errorf("anime job: %q isn't a stage (all, %s)", st, strings.Join(anime.Stages, ", "))
+		}
+	}
+	return out, nil
 }

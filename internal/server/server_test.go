@@ -915,6 +915,8 @@ func TestAddJobFromTheStatusPage(t *testing.T) {
 		"bad cron":        {"target": "Summarise my notes folder please", "cron": "99 * * * *"},
 		"unknown skill":   {"target": "nosuchskill", "every": "6h"},
 		"unknown channel": {"target": "Summarise my notes folder please", "every": "6h", "notify": []string{"pigeon"}},
+		"bad anime stage": {"target": "anime:nope", "every": "6h"},
+		"anime + model":   {"target": "anime:download", "every": "6h", "model": "granite4:3b"},
 		"bad condition":   {"target": "Summarise my notes folder please", "every": "6h", "when": []string{"full-moon"}},
 	} {
 		if resp, body := g.do("POST", "/noskill/v1/jobs", bad, tray); resp.StatusCode != 400 {
@@ -924,6 +926,11 @@ func TestAddJobFromTheStatusPage(t *testing.T) {
 	resp, body := g.do("POST", "/noskill/v1/jobs", spec, tray)
 	if resp.StatusCode != 200 || !strings.Contains(string(body), `"summarise-my-notes-folder"`) {
 		t.Fatalf("add: %d %s", resp.StatusCode, body)
+	}
+	// An anime job runs the tracker itself: no skill, no model.
+	resp, body = g.do("POST", "/noskill/v1/jobs", map[string]any{"target": "anime:download,file", "cron": "0 14 * * 6"}, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"name":"anime-download-file"`) || !strings.Contains(string(body), `"target_kind":"anime"`) {
+		t.Fatalf("anime job: %d %s", resp.StatusCode, body)
 	}
 	_, body = g.do("GET", "/noskill/v1/status", nil, tray)
 	if !strings.Contains(string(body), `"name":"summarise-my-notes-folder"`) || !strings.Contains(string(body), "every:6h") {

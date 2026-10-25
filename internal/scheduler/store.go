@@ -18,7 +18,7 @@ import (
 type Job struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
-	TargetKind string `json:"target_kind"` // skill | prompt
+	TargetKind string `json:"target_kind"` // skill | prompt | anime (the tracker, no model; Target is its stages)
 	Target     string `json:"target"`
 	Args       Args   `json:"args"`
 	Schedule   string `json:"schedule"` // cron:<expr> | every:<duration>

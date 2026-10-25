@@ -138,7 +138,7 @@ function el(tag, attrs, ...kids) {
   for (const c of kids.flat()) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c)));
   return e;
 }
-function put(id, ...kids) { const n = $(id); n.replaceChildren(...kids.flat()); }
+function put(id, ...kids) { const n = $(id); n.replaceChildren(...kids.flat().filter(k => k != null)); }
 function empty(t) { return el("div", {class: "empty"}, t); }
 function chip(t, cls) { return el("span", {class: "chip " + (cls || "")}, t); }
 function table(head, rows) {
