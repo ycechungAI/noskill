@@ -201,10 +201,15 @@ func (s *runServices) ListReminders(ctx context.Context) (string, error) {
 }
 
 func (s *runServices) RemoveReminder(ctx context.Context, name string) error {
-	st := &scheduler.Store{DB: s.a.DB}
+	return s.a.RemoveReminder(ctx, name)
+}
+
+// RemoveReminder deletes a reminder job by name.
+func (a *App) RemoveReminder(ctx context.Context, name string) error {
+	st := &scheduler.Store{DB: a.DB}
 	j, err := st.Get(ctx, name)
 	if err != nil || j.TargetKind != "remind" {
-		return fmt.Errorf("no reminder named %q (reminder_list shows them)", name)
+		return &UserError{fmt.Sprintf("no reminder named %q (reminder_list shows them)", name)}
 	}
 	return st.Remove(ctx, j.ID)
 }

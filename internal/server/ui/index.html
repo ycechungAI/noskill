@@ -88,6 +88,17 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
           <span></span><span class="row"><button class="go" id="job-go" type="submit">Add job</button><span id="job-msg" role="status"></span></span>
         </form></details></section>
     <section id="s-skills"><h2>Skills</h2><div class="scroll" id="skills"></div></section>
+    <section class="wide" id="s-brief"><h2>Brief</h2>
+      <p class="lead" style="margin-top:0">What happened on this computer, built from noskill's own records (no model). <code>noskill schedule add brief --cron "0 7 * * *"</code> sends it as a notification every morning.</p>
+      <div class="row" style="margin-bottom:8px"><label for="brief-hours" class="mute">Since</label>
+        <select id="brief-hours" aria-label="How far back"><option value="12">12 hours ago</option><option value="24" selected>yesterday</option><option value="72">3 days ago</option><option value="168">a week ago</option></select>
+        <button id="brief-go" type="button">Refresh</button><span class="mute" id="brief-at"></span></div>
+      <pre class="msg" id="brief-text" aria-live="polite" style="white-space:pre-wrap;margin:0 0 12px">Loading…</pre>
+      <form class="addf" id="remf" autocomplete="off" style="grid-template-columns:minmax(0,1fr) max-content">
+        <input id="rem-text" type="text" spellcheck="false" placeholder="Remind me… e.g. call Sam tomorrow at 5pm, or every Monday at 9 submit the report" aria-label="A reminder, in your own words" required>
+        <button class="go" id="rem-go" type="submit">Add reminder</button>
+        <span id="rem-msg" role="status" style="grid-column:1/-1"></span></form>
+      <div class="scroll" id="reminders"></div></section>
     <section class="wide" id="s-models"><h2>Models</h2><div id="mtask"></div><div class="scroll" id="models"></div>
       <p class="lead" style="margin:8px 0 0">Bench times a model and runs the quick quality check (a few minutes at most); it unloads the model first. One action runs at a time, and none starts while a scheduled job is running.</p></section>
     <section id="s-learning"><h2>Learning</h2><div class="scroll" id="learning"></div><h2 style="margin-top:14px">Evaluation</h2><div class="scroll" id="eval"></div></section>
@@ -423,6 +434,44 @@ function renderHistory() {
 }
 
 let timer = 0;
+
+// ---- brief and reminders (the daily-brief skill: GET /noskill/v1/brief, /noskill/v1/reminders) ----
+async function loadBrief() {
+  try {
+    const r = await api("/noskill/v1/brief?hours=" + $("brief-hours").value);
+    if (!r.ok) return;
+    const j = await r.json();
+    $("brief-text").textContent = j.brief;
+    $("brief-at").textContent = "as of " + new Date(j.at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+  } catch (e) { /* the status call reports a lost server */ }
+}
+async function loadReminders() {
+  try {
+    const r = await api("/noskill/v1/reminders");
+    if (!r.ok) return;
+    const rows = ((await r.json()).reminders || []).map(x => [
+      x.text, el("code", {}, x.schedule), x.active ? ago(x.next) : el("span", {class: "mute"}, "done"),
+      el("button", {onclick: async () => { await api("/noskill/v1/reminders/" + encodeURIComponent(x.name) + "/remove", {method: "POST"}); loadReminders(); }}, "Remove")]);
+    put("reminders", table(["Reminder", "Schedule", "Next", ""], rows) || empty("No reminders yet."));
+  } catch (e) { /* ignored */ }
+}
+$("brief-go").onclick = loadBrief;
+$("brief-hours").onchange = loadBrief;
+$("remf").onsubmit = async e => {
+  e.preventDefault();
+  const msg = $("rem-msg"), go = $("rem-go");
+  go.disabled = true; msg.className = "mute"; msg.textContent = "adding…";
+  const r = await api("/noskill/v1/reminders", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({text: $("rem-text").value})});
+  let j = {}; try { j = await r.json(); } catch (x) {}
+  go.disabled = false;
+  if (r.ok) { msg.className = "ok"; msg.textContent = "“" + j.reminder + "”: " + j.when; $("rem-text").value = ""; loadReminders(); }
+  else { msg.className = "bad"; msg.textContent = (j.error && j.error.message) || "Couldn't add it (" + r.status + ")"; }
+};
+let briefAt = 0;
+function briefTick() { // the brief and reminders change slowly: load them with the first status, then every few minutes
+  if (Date.now() - briefAt < 300000) return;
+  briefAt = Date.now(); loadBrief(); loadReminders();
+}
 async function refresh() {
   clearTimeout(timer);
   try {
@@ -433,6 +482,7 @@ async function refresh() {
     const d = await r.json();
     await loadTasks();
     render(d);
+    briefTick();
     if (!shown) { // first load: the tab in the address, else Approvals when something waits, else Overview
       const h = location.hash.slice(1);
       setTab(h.startsWith("a-") ? "approvals" : TABS.includes(h) ? h : (d.status.approvals || []).length ? "approvals" : "overview");

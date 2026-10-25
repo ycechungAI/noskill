@@ -16,8 +16,8 @@ noskill:
     exec: false
   confirm: [tidy_apply]
   tools:
-    - builtin: tidy_plan      # { folder?, only?, min_age_days? } → counts per folder, examples, left_alone; changes nothing
-    - builtin: tidy_apply     # { folder?, only?, min_age_days? } → plans again and carries it out (asks first)
+    - builtin: tidy_plan      # { folder?, only? } → counts per folder, examples, left_alone; changes nothing
+    - builtin: tidy_apply     # { folder?, only? } → plans again and carries it out (asks first)
 ---
 
 # Downloads tidy
@@ -27,12 +27,12 @@ The plan is made in Go: you call one tool, show the result and apply it.
 ## Steps
 1. `tidy_plan` (add `folder` if the user named another one, `only` if they want just some kinds).
 2. Tell the user in two or three lines what it found: how many files go to which folder (`summary`), a couple of `examples`, how many old installers go to the trash, and that `left_alone` files stay.
-3. `tidy_apply` with the same arguments. It asks the user first, then moves the files and trashes the old installers.
+3. Then call `tidy_apply` with the same arguments right away. Don't ask the user in words first: the tool asks them, and nothing changes until they say yes.
 4. Report what moved and was skipped. Say that `noskill undo <run-id>` puts the moves back and that trashed installers are in the OS trash.
 
 ## Rules
 - Never move or trash files any other way; `tidy_apply` is the only tool that changes anything.
-- Folders and recent files are left alone on purpose. Videos wait two weeks because the anime tracker downloads to this folder and files them itself.
+- Folders and files changed in the last day are left alone on purpose (they may still be downloading). Videos wait two weeks because the anime tracker downloads to this folder and files them itself.
 
 <!--
 === Implementation spec ===
@@ -42,6 +42,7 @@ older than 30 days go to the trash). Tools: internal/tools/builtin/chores.go (ti
 applying and carries out that plan (moves through the permission broker, so they are logged for `noskill undo`;
 installers to the OS trash), so the model can't pass or alter a plan. It does not depend on the files skill: a first
 live run with granite4:3b used the files skill's ungated `trash` instead of the gated tool.
-Settings ([skills.downloads-tidy]): folder (default "Sorted"), allow (extra folders).
+Settings ([skills.downloads-tidy]): folder (default "Sorted"), min_age_hours (default 24; 0 sorts files changed today
+too; a setting, not a tool argument, because a small model switched it on unprompted in a trial), allow (extra folders).
 Tests: internal/chores TestPlanTidy; builtin tests.
 -->

@@ -4,6 +4,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"noskill/internal/app"
 )
@@ -80,4 +83,71 @@ func (s *Server) ui(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Security-Policy", "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 	h.Set("X-Content-Type-Options", "nosniff")
 	w.Write(uiPage)
+}
+
+// brief: the morning digest (daily-brief skill), built in code with no model.
+func (s *Server) brief(w http.ResponseWriter, r *http.Request) {
+	hours := 24
+	if v := r.URL.Query().Get("hours"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 168 {
+			s.fail(w, r, bad("hours: 1 to 168"))
+			return
+		}
+		hours = n
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"hours": hours, "brief": s.App.Brief(r.Context(), hours), "at": time.Now()})
+}
+
+// reminderView is a reminder job as the page shows it.
+type reminderView struct {
+	Name     string    `json:"name"`
+	Text     string    `json:"text"`
+	Schedule string    `json:"schedule"`
+	Next     time.Time `json:"next,omitzero"`
+	Once     bool      `json:"once,omitempty"`
+	Active   bool      `json:"active"`
+}
+
+func (s *Server) listReminders(w http.ResponseWriter, r *http.Request) {
+	jobs, err := s.App.Reminders(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	out := []reminderView{}
+	for _, j := range jobs {
+		out = append(out, reminderView{j.Name, j.Target, j.Schedule, j.NextRunAt, j.Args.Once, j.Enabled})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"reminders": out})
+}
+
+// addReminder: {"text": "call Sam tomorrow at 5pm"}. The sentence is read in Go; when it can't tell
+// when, the 400 says what to say instead.
+func (s *Server) addReminder(w http.ResponseWriter, r *http.Request) {
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(body, &in); err != nil || strings.TrimSpace(in.Text) == "" {
+		s.fail(w, r, bad(`send {"text": "call Sam tomorrow at 5pm"}`))
+		return
+	}
+	j, rem, err := s.App.AddReminder(r.Context(), in.Text)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "name": j.Name, "reminder": rem.Message, "when": rem.When, "next": j.NextRunAt})
+}
+
+func (s *Server) removeReminder(w http.ResponseWriter, r *http.Request) {
+	if err := s.App.RemoveReminder(r.Context(), r.PathValue("name")); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

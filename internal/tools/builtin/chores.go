@@ -42,13 +42,13 @@ func Chores() []tools.Builtin {
 	obj := func(s string) json.RawMessage { return json.RawMessage(s) }
 	return []tools.Builtin{
 		{ID: "tidy_plan", Description: "Propose how to sort the loose files of a folder (default Downloads) into Documents, Images, Installers and so on. Returns a plan for move_many, old installers for the trash, and the files it leaves alone with the reason. Changes nothing.",
-			Schema: obj(`{"type":"object","properties":{"folder":{"type":"string","default":"$DOWNLOADS"},"only":{"type":"array","items":{"type":"string"},"description":"Sort only these categories, e.g. [\"Documents\",\"Images\"]"},"min_age_days":{"type":"integer","minimum":0,"description":"Leave files newer than this alone (default 1)"}}}`),
+			Schema: obj(`{"type":"object","properties":{"folder":{"type":"string","default":"$DOWNLOADS"},"only":{"type":"array","items":{"type":"string"},"description":"Sort only these categories, e.g. [\"Documents\",\"Images\"]"}}}`),
 			Run:    tidyPlan},
 		{ID: "tidy_apply", Description: "Do the tidy: plan the folder again right now and carry it out, moving each file into its folder and old installers to the OS trash. Asks the user first. Nothing is deleted for good and nothing is replaced; the moves can be undone.",
-			Schema: obj(`{"type":"object","properties":{"folder":{"type":"string","default":"$DOWNLOADS"},"only":{"type":"array","items":{"type":"string"}},"min_age_days":{"type":"integer","minimum":0}}}`),
+			Schema: obj(`{"type":"object","properties":{"folder":{"type":"string","default":"$DOWNLOADS"},"only":{"type":"array","items":{"type":"string"}}}}`),
 			Run:    tidyApply},
 		{ID: "dupes_find", Description: "Find files with identical content in one or more folders. Returns groups with the copy to keep and the others as candidates for the trash, and how much space they take. Changes nothing.",
-			Schema: obj(`{"type":"object","required":["folders"],"properties":{"folders":{"type":"array","minItems":1,"maxItems":6,"items":{"type":"string"}},"min_mb":{"type":"number","default":1,"minimum":0.01,"description":"Ignore files smaller than this"}}}`),
+			Schema: obj(`{"type":"object","required":["folders"],"properties":{"folders":{"type":"array","minItems":1,"maxItems":6,"items":{"type":"string"}},"min_mb":{"type":"number","default":1,"minimum":0,"description":"Ignore files smaller than this many MB"},"include_small":{"type":"boolean","default":false,"description":"Also compare files under 1 MB, however small"}}}`),
 			Run:    dupesFind},
 		{ID: "dupes_trash", Description: "Move duplicate copies to the OS trash. Each path must have exactly the same content as keep (checked again now) and may not be keep itself. Nothing is deleted for good.",
 			Schema: obj(`{"type":"object","required":["keep","paths"],"properties":{"keep":{"type":"string","description":"The copy that stays"},"paths":{"type":"array","minItems":1,"maxItems":50,"items":{"type":"string"}}}}`),
@@ -112,13 +112,12 @@ func Chores() []tools.Builtin {
 }
 
 type tidyArgs struct {
-	Folder     string
-	Only       []string
-	MinAgeDays *int `json:"min_age_days"`
+	Folder string
+	Only   []string
 }
 
 // planTidy reads the folder and plans it; tidy_plan shows the result and tidy_apply carries it out.
-func planTidy(env *tools.Env, raw json.RawMessage) (root string, p chores.TidyPlan, err error) {
+func planTidy(env *tools.Env, raw json.RawMessage, write bool) (root string, p chores.TidyPlan, err error) {
 	a := tidyArgs{Folder: "$DOWNLOADS"}
 	if len(raw) > 0 {
 		arg(raw, &a)
@@ -129,7 +128,11 @@ func planTidy(env *tools.Env, raw json.RawMessage) (root string, p chores.TidyPl
 	if root, err = env.Expand(a.Folder); err != nil {
 		return "", p, err
 	}
-	if root, err = env.Perms.CheckWrite(root); err != nil { // the plan is for moving, which writes
+	check := env.Perms.CheckRead // looking at a folder needs only read access; applying the plan needs write
+	if write {
+		check = env.Perms.CheckWrite
+	}
+	if root, err = check(root); err != nil {
 		return "", p, err
 	}
 	des, err := os.ReadDir(root)
@@ -145,10 +148,14 @@ func planTidy(env *tools.Env, raw json.RawMessage) (root string, p chores.TidyPl
 		entries = append(entries, chores.Entry{Name: d.Name(), Size: fi.Size(), ModTime: fi.ModTime(), IsDir: d.IsDir(), Link: d.Type()&os.ModeSymlink != 0})
 	}
 	o := chores.TidyOptions{Only: a.Only}
-	if a.MinAgeDays != nil {
-		o.MinAge = time.Duration(*a.MinAgeDays) * 24 * time.Hour
-		if *a.MinAgeDays == 0 {
-			o.MinAge = time.Nanosecond
+	// Whether a file changed today is left alone is the user's setting, not something the model can
+	// switch off in a call: a small model flipped it unprompted in a trial.
+	if v, ok := skillSetting(env, "min_age_hours"); ok {
+		if h, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil && h >= 0 {
+			o.MinAge = time.Duration(h * float64(time.Hour))
+			if h == 0 {
+				o.MinAge = time.Nanosecond
+			}
 		}
 	}
 	if v, ok := skillSetting(env, "folder"); ok && v != "" {
@@ -158,17 +165,17 @@ func planTidy(env *tools.Env, raw json.RawMessage) (root string, p chores.TidyPl
 }
 
 func tidyPlan(_ context.Context, env *tools.Env, raw json.RawMessage) (string, error) {
-	root, p, err := planTidy(env, raw)
+	root, p, err := planTidy(env, raw, false)
 	if err != nil {
 		return "", err
 	}
+	next := "tell the user what it found, then tidy_apply with the same arguments (it asks them first)"
 	return jsonOut(map[string]any{"folder": root, "moves": len(p.Moves), "summary": p.Summary, "old_installers_to_trash": len(p.Trash),
-		"examples": firstMoves(p.Moves, 6), "left_alone": p.Kept,
-		"next": "tell the user what it found, then tidy_apply (it asks them first)"})
+		"examples": firstMoves(p.Moves, 6), "left_alone_count": len(p.Kept), "left_alone": capKept(p.Kept), "next": next})
 }
 
 func tidyApply(ctx context.Context, env *tools.Env, raw json.RawMessage) (string, error) {
-	root, p, err := planTidy(env, raw)
+	root, p, err := planTidy(env, raw, true)
 	if err != nil {
 		return "", err
 	}
@@ -183,6 +190,15 @@ func tidyApply(ctx context.Context, env *tools.Env, raw json.RawMessage) (string
 	}
 	return jsonOut(map[string]any{"folder": root, "moved": moved, "trashed": trashed, "skipped": skipped,
 		"undo": "noskill undo <run-id> puts the moves back; the trashed files are in the OS trash"})
+}
+
+// capKept keeps the list the model reads short: a folder of hundreds of files must not fill an 8k context.
+// The count is reported separately.
+func capKept(k []chores.Kept) []chores.Kept {
+	if len(k) > 20 {
+		return k[:20]
+	}
+	return k
 }
 
 type exampleMove struct {
@@ -220,8 +236,9 @@ func applyMoves(ctx context.Context, env *tools.Env, ms []chores.Move) (moved in
 
 func dupesFind(ctx context.Context, env *tools.Env, raw json.RawMessage) (string, error) {
 	var a struct {
-		Folders []string
-		MinMB   float64 `json:"min_mb"`
+		Folders      []string
+		MinMB        float64 `json:"min_mb"`
+		IncludeSmall bool    `json:"include_small"`
 	}
 	arg(raw, &a)
 	var roots []string
@@ -241,6 +258,9 @@ func dupesFind(ctx context.Context, env *tools.Env, raw json.RawMessage) (string
 	o := chores.DupeOptions{}
 	if a.MinMB > 0 {
 		o.MinSize = int64(a.MinMB * (1 << 20))
+	}
+	if a.IncludeSmall {
+		o.MinSize = 1
 	}
 	res, err := chores.FindDuplicates(ctx, roots, o)
 	if err != nil {
@@ -304,13 +324,17 @@ func settingFloat(env *tools.Env, key string) float64 {
 	return f
 }
 
-func planRename(env *tools.Env, raw json.RawMessage) (dir string, p chores.RenamePlan, err error) {
+func planRename(env *tools.Env, raw json.RawMessage, write bool) (dir string, p chores.RenamePlan, err error) {
 	var a struct{ Folder, Show, Style string }
 	arg(raw, &a)
 	if dir, err = env.Expand(a.Folder); err != nil {
 		return "", p, err
 	}
-	if dir, err = env.Perms.CheckWrite(dir); err != nil {
+	check := env.Perms.CheckRead
+	if write {
+		check = env.Perms.CheckWrite
+	}
+	if dir, err = check(dir); err != nil {
 		return "", p, err
 	}
 	des, err := os.ReadDir(dir)
@@ -327,24 +351,27 @@ func planRename(env *tools.Env, raw json.RawMessage) (dir string, p chores.Renam
 }
 
 func renamePlan(_ context.Context, env *tools.Env, raw json.RawMessage) (string, error) {
-	dir, p, err := planRename(env, raw)
+	dir, p, err := planRename(env, raw, false)
 	if err != nil {
 		return "", err
 	}
-	type ex struct{ From, To string }
-	var examples []ex
+	type ex struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	}
+	examples := []ex{}
 	for i, m := range p.Moves {
 		if i == 6 {
 			break
 		}
 		examples = append(examples, ex{filepath.Base(m.From), filepath.Base(m.To)})
 	}
-	return jsonOut(map[string]any{"folder": dir, "renames": len(p.Moves), "examples": examples, "left_alone": p.Kept,
+	return jsonOut(map[string]any{"folder": dir, "renames": len(p.Moves), "examples": examples, "left_alone_count": len(p.Kept), "left_alone": capKept(p.Kept),
 		"next": "show the user a few of the new names, then rename_apply (it asks them first)"})
 }
 
 func renameApply(ctx context.Context, env *tools.Env, raw json.RawMessage) (string, error) {
-	dir, p, err := planRename(env, raw)
+	dir, p, err := planRename(env, raw, true)
 	if err != nil {
 		return "", err
 	}

@@ -1,0 +1,110 @@
+# Agent tasks for the housekeeping skills (downloads-tidy, duplicate-finder, disk-watch,
+# media-renamer, daily-brief): the whole loop with real tools against a temporary folder ({dir}).
+# Nothing here touches the OS trash, the user's reminders or the network. The tidy tasks age their
+# files (aged_days), because tidy leaves alone anything changed in the last day.
+- id: tidy-01
+  type: tidy
+  skills: [downloads-tidy]
+  writes: true
+  prompt: "Tidy the folder {dir}: sort its files into folders by type."
+  files: { report.pdf: pdf, photo.jpg: img, data.csv: "a,b", notes.txt: text }
+  aged_days: { report.pdf: 3, photo.jpg: 3, data.csv: 3, notes.txt: 3 }
+  tools: [tidy_apply]
+  check: { answered: true }
+  end:
+    exists: [Sorted/Documents/report.pdf, Sorted/Documents/notes.txt, Sorted/Images/photo.jpg, Sorted/Spreadsheets/data.csv]
+    absent: [report.pdf, photo.jpg, data.csv, notes.txt]
+- id: tidy-02
+  type: tidy
+  skills: [downloads-tidy]
+  prompt: "How many files in {dir} would tidying move? Don't change anything. Just the number."
+  files: { a.pdf: one, b.pdf: two, c.png: three, mystery.xyz: four }
+  aged_days: { a.pdf: 5, b.pdf: 5, c.png: 5, mystery.xyz: 5 }
+  tools: [tidy_plan]
+  check: { number: 3 }
+  end: { exists: [a.pdf, b.pdf, c.png, mystery.xyz], absent: [Sorted] }
+- id: tidy-03
+  type: tidy
+  skills: [downloads-tidy]
+  writes: true
+  prompt: "Tidy {dir}: sort the files by type."
+  files: { episode.mkv: video, letter.pdf: text }
+  aged_days: { episode.mkv: 3, letter.pdf: 3 }
+  tools: [tidy_apply]
+  check: { answered: true }
+  # A video this new is the anime tracker's to file: it stays put.
+  end: { exists: [Sorted/Documents/letter.pdf, episode.mkv], absent: [letter.pdf, Sorted/Videos] }
+- id: tidy-04
+  type: tidy
+  skills: [downloads-tidy]
+  writes: true
+  prompt: "Tidy the folder {dir}: sort its files by type."
+  files: { old.pdf: one, today.pdf: two }
+  aged_days: { old.pdf: 4 }
+  tools: [tidy_apply]
+  check: { answered: true }
+  # A file changed today may still be downloading: it stays.
+  end: { exists: [Sorted/Documents/old.pdf, today.pdf], absent: [old.pdf, Sorted/Documents/today.pdf] }
+- id: dupes-01
+  type: dupes
+  skills: [duplicate-finder]
+  prompt: "Which files in {dir} are copies of each other (same content, whatever the name)? Include small files. Name them."
+  files: { holiday.txt: "same words", backup.txt: "same words", other.txt: "different words" }
+  tools: [dupes_find]
+  check: { contains: [holiday.txt, backup.txt], not: [other.txt] }
+- id: dupes-02
+  type: dupes
+  skills: [duplicate-finder]
+  prompt: "Look for duplicate files in {dir}, small ones too. Which copy should I keep of the duplicates? Don't remove anything. Give just the file name."
+  files: { "report.txt": "quarterly numbers", "report (1).txt": "quarterly numbers", "memo.txt": "other" }
+  tools: [dupes_find]
+  check: { contains: [report.txt], not_regex: ['(?i)keep\W{0,4}report \(1\)'] }
+  end: { exists: [report.txt, "report (1).txt", memo.txt] }
+- id: dupes-03
+  type: dupes
+  skills: [duplicate-finder]
+  prompt: "Are there any duplicate files in {dir}, small ones included? Answer yes or no."
+  files: { a.txt: "one thing", b.txt: "another thing", c.txt: "a third thing" }
+  tools: [dupes_find]
+  check: { any: ["no"], not: ["yes"] }
+- id: disk-01
+  type: disk
+  skills: [disk-watch]
+  prompt: "Which folder inside {dir} takes the most space? Just its name."
+  files:
+    alpha/a.txt: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    alpha/b.txt: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    beta/c.txt: "c"
+  tools: [disk_report]
+  check: { contains: [alpha], not: [beta] }
+- id: rename-01
+  type: rename
+  skills: [media-renamer]
+  writes: true
+  prompt: "Rename the episodes in {dir} to one clean pattern. The show is called Test Show."
+  files:
+    "[Grp] Test Show - 01 (480p) [AB12CD31].mkv": a
+    "[Grp] Test Show - 02 (480p) [AB12CD32].mkv": b
+    "[Grp] Test Show - 03 (480p) [AB12CD33].mkv": c
+  tools: [rename_apply]
+  check: { answered: true }
+  end:
+    exists: ["Test Show Episode 1 [480p].mkv", "Test Show Episode 2 [480p].mkv", "Test Show Episode 3 [480p].mkv"]
+    absent: ["[Grp] Test Show - 01 (480p) [AB12CD31].mkv"]
+- id: rename-02
+  type: rename
+  skills: [media-renamer]
+  prompt: "Without renaming anything, how many video files in {dir} can't be renamed because their show or episode can't be read? Just the number."
+  files:
+    "[Grp] Test Show - 01 (480p) [AB12CD31].mkv": a
+    "[Grp] Test Show - 02 (480p) [AB12CD32].mkv": b
+    "random video.mkv": c
+  tools: [rename_plan]
+  check: { number: 1 }
+  end: { exists: ["random video.mkv", "[Grp] Test Show - 01 (480p) [AB12CD31].mkv"] }
+- id: brief-01
+  type: brief
+  skills: [daily-brief]
+  prompt: "What happened on this computer in the last day? Give me the morning brief."
+  tools: [brief_build]
+  check: { answered: true }

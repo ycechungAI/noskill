@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"noskill/internal/perms"
 	"noskill/internal/tools"
 )
 
@@ -162,5 +163,31 @@ func TestReminderToolsNeedTheService(t *testing.T) {
 	f.env.Svc = svc
 	if _, err := callChores(t, "reminder_add", f.env, map[string]any{"text": "call Sam tomorrow at 5pm"}); err != nil || len(svc.added) != 1 {
 		t.Errorf("added = %v err = %v", svc.added, err)
+	}
+}
+
+// Looking at a folder takes read access; only applying a plan needs write.
+func TestPlanToolsNeedOnlyReadAccess(t *testing.T) {
+	f := newFx(t)
+	f.write("report.pdf", "pdf")
+	f.write("[Grp] Show - 01 (480p) [AB12CD31].mkv", "a")
+	canon, _ := perms.Canonical(f.root)
+	f.env.Perms = perms.Set{Files: []perms.Scope{{Access: perms.Read, Root: canon}}}
+	f.env.Broker = &perms.Broker{RunID: "r", Perms: f.env.Perms, Trash: trashRecorder{t.TempDir()}}
+	for id, args := range map[string]any{
+		"tidy_plan":   map[string]any{"folder": f.root},
+		"rename_plan": map[string]any{"folder": f.root, "show": "Show"},
+	} {
+		if _, err := callChores(t, id, f.env, args); err != nil {
+			t.Errorf("%s with read access: %v", id, err)
+		}
+	}
+	for id, args := range map[string]any{
+		"tidy_apply":   map[string]any{"folder": f.root},
+		"rename_apply": map[string]any{"folder": f.root, "show": "Show"},
+	} {
+		if _, err := callChores(t, id, f.env, args); err == nil {
+			t.Errorf("%s changed files with read-only access", id)
+		}
 	}
 }

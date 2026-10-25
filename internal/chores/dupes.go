@@ -45,7 +45,7 @@ type DupeOptions struct {
 }
 
 func (o DupeOptions) withDefaults() DupeOptions {
-	if o.MinSize <= 0 {
+	if o.MinSize <= 0 { // 1 means "every file, however small"
 		o.MinSize = 1 << 20
 	}
 	if o.MaxFiles <= 0 {

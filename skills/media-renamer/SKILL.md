@@ -28,7 +28,7 @@ The names are worked out in Go with the anime tracker's own reader, so renamed f
 ## Steps
 1. `rename_plan` with the folder. If the user gave the show's name, pass it as `show`; otherwise it is read from each file. `style` is `episode` ("Show Episode 3", the default), `ep` ("Show EP 3") or `sxxexx` ("Show S01E03").
 2. Show the user the first `examples` (old name, new name) and say how many files change (`renames`) and how many are left alone (`left_alone` says why: can't tell the episode, several episodes in one file, and so on).
-3. `rename_apply` with the same arguments. It asks the user first, then renames.
+3. Then call `rename_apply` with the same arguments right away. Don't ask the user in words first: the tool asks them, and nothing is renamed until they say yes.
 4. Say how many were renamed and that `noskill undo <run-id>` puts the old names back.
 
 ## Rules

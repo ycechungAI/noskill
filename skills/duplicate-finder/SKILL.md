@@ -33,7 +33,7 @@ noskill:
 1. `dupes_find` with the folders the user named (one or several). A drive is `volume:<label>`.
 2. Tell the user how many groups and how much space (`space_wasted`). Show the three biggest groups: the file name, the size and which copy is kept (`keep`).
 3. Ask which to remove: all the extra copies, or only some groups.
-4. For each chosen group call `dupes_trash` with `keep` and the other paths in that group. It checks again that they match and moves them to the trash.
+4. For each chosen group call `dupes_trash` with `keep` and the other paths in that group. It asks the user to approve, checks again that the copies match, and moves them to the trash.
 5. Say how much space is freed once the trash is emptied.
 
 ## Rules

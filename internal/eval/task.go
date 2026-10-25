@@ -29,6 +29,7 @@ type Task struct {
 	// Agent tasks.
 	Skills   []string          `yaml:"skills,omitempty" json:"skills,omitempty"`
 	Files    map[string]string `yaml:"files,omitempty" json:"files,omitempty"`                 // created in {dir} before the run
+	Aged     map[string]int    `yaml:"aged_days,omitempty" json:"aged_days,omitempty"`         // files made this many days old (their modified time), for tasks where age matters
 	Docs     map[string]string `yaml:"docs,omitempty" json:"docs,omitempty"`                   // a folder of documents, added and indexed for this run alone (local-docs tasks)
 	Tools    []string          `yaml:"tools,omitempty" json:"tools,omitempty"`                 // at least one must have been called (see ToolsMet)
 	Writes   bool              `yaml:"writes,omitempty" json:"writes,omitempty"`               // the run may write in {dir}

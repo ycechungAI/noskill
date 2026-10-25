@@ -51,3 +51,6 @@ _Last updated: 2026-10-24 by Claude Code_
   `diskwatch`; CLI `noskill remind` and `noskill brief`. Live-checked with granite4:3b in a scratch home.
 - Not done: the live daemon still runs the older build; none of the five is scheduled yet (no `brief`/`diskwatch` jobs
   added to the user's config); disk-watch `volumes` setting untested on Windows/Linux (uses platform.ListVolumes).
+- Status page: Brief section (digest + reminders box) between Skills and Models; endpoints `/noskill/v1/brief`,
+  `/noskill/v1/reminders`. Housekeeping eval suite `internal/eval/tasks/chores.yaml` (11 tasks; granite4:3b scores
+  8-10 of 11 run to run; tidy-01/tidy-02/rename-01 are the flaky ones). Eval tasks can now set `aged_days` and put files in subfolders.

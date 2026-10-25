@@ -222,7 +222,19 @@ func (a *App) evalTaskWith(ctx context.Context, model string, t eval.Task, learn
 		}
 		dir = d
 		for name, body := range t.Files {
-			if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(name)), []byte(body), 0o644); err != nil {
+			path := filepath.Join(dir, filepath.FromSlash(name))
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				res.Why = err.Error()
+				return res, ""
+			}
+			if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+				res.Why = err.Error()
+				return res, ""
+			}
+		}
+		for name, days := range t.Aged {
+			old := time.Now().AddDate(0, 0, -days)
+			if err := os.Chtimes(filepath.Join(dir, filepath.FromSlash(name)), old, old); err != nil {
 				res.Why = err.Error()
 				return res, ""
 			}

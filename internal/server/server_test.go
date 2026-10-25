@@ -947,3 +947,45 @@ func TestAddJobFromTheStatusPage(t *testing.T) {
 		t.Errorf("the job isn't in the status: %s", body)
 	}
 }
+
+// The Brief section of the status page: the digest and the reminders (daily-brief skill).
+func TestBriefAndRemindersFromTheStatusPage(t *testing.T) {
+	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {
+		c.Server.Tokens = []config.Token{{Name: "chat", Token: "secret:C"}, {Name: "tray", Token: "secret:T", Admin: true}}
+	}, map[string]string{"C": "chat-token-0123456789", "T": "tray-token-0123456789"})
+	chat := map[string]string{"Authorization": "Bearer chat-token-0123456789"}
+	tray := map[string]string{"Authorization": "Bearer tray-token-0123456789"}
+
+	for _, c := range []struct{ method, path string }{{"GET", "/noskill/v1/brief"}, {"GET", "/noskill/v1/reminders"}, {"POST", "/noskill/v1/reminders"}, {"POST", "/noskill/v1/reminders/x/remove"}} {
+		if resp, _ := g.do(c.method, c.path, map[string]string{"text": "x"}, nil); resp.StatusCode != 401 {
+			t.Errorf("%s %s without a token: %d", c.method, c.path, resp.StatusCode)
+		}
+		if resp, _ := g.do(c.method, c.path, map[string]string{"text": "x"}, chat); resp.StatusCode != 403 {
+			t.Errorf("%s %s for a chat token: %d", c.method, c.path, resp.StatusCode)
+		}
+	}
+	resp, body := g.do("GET", "/noskill/v1/brief?hours=12", nil, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"hours":12`) || !strings.Contains(string(body), `"brief":"`) {
+		t.Errorf("brief: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := g.do("GET", "/noskill/v1/brief?hours=900", nil, tray); resp.StatusCode != 400 {
+		t.Errorf("900 hours: %d", resp.StatusCode)
+	}
+	if resp, body := g.do("POST", "/noskill/v1/reminders", map[string]string{"text": "call Sam"}, tray); resp.StatusCode != 400 || !strings.Contains(string(body), "when") {
+		t.Errorf("a reminder with no time: %d %s", resp.StatusCode, body)
+	}
+	resp, body = g.do("POST", "/noskill/v1/reminders", map[string]string{"text": "remind me to submit the report every Monday at nine"}, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"reminder":"Submit the report"`) || !strings.Contains(string(body), "every Monday at 09:00") {
+		t.Fatalf("add: %d %s", resp.StatusCode, body)
+	}
+	_, body = g.do("GET", "/noskill/v1/reminders", nil, tray)
+	if !strings.Contains(string(body), `"name":"remind-submit-the-report"`) {
+		t.Errorf("list: %s", body)
+	}
+	if resp, body := g.do("POST", "/noskill/v1/reminders/remind-submit-the-report/remove", nil, tray); resp.StatusCode != 200 {
+		t.Errorf("remove: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := g.do("POST", "/noskill/v1/reminders/remind-submit-the-report/remove", nil, tray); resp.StatusCode != 400 {
+		t.Errorf("removing it twice: %d", resp.StatusCode)
+	}
+}

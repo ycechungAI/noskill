@@ -175,6 +175,7 @@ volumes = []              # labels to watch; empty = every drive over 2 GB
 
 [skills.downloads-tidy]
 folder = "Sorted"         # where sorted files go, inside the folder
+min_age_hours = 24        # files changed more recently are left alone (they may still be downloading); 0 = sort them too
 
 [skills.duplicate-finder]
 allow = ["read:volume:RED", "write:volume:RED"]   # drives it may scan and trash copies on
