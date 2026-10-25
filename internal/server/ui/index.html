@@ -48,7 +48,7 @@ code{font:12px ui-monospace,Menlo,Consolas,monospace}
 .tabpanel.on{display:grid}
 p.lead{margin:0 0 8px;color:var(--mute)}
 .addf{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 10px;align-items:center}
-.addf input{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:100%}
+.addf select,.addf input{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:100%}
 .addf input:focus-visible,button:focus-visible,#tabs button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;white-space:pre-wrap;font:12px ui-monospace,Menlo,Consolas,monospace}
 .path{font:12px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
@@ -72,9 +72,24 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
 </nav>
 <main>
   <div class="tabpanel" id="p-overview" role="tabpanel" aria-labelledby="tab-overview">
-    <section id="s-jobs"><h2>Jobs</h2><div class="scroll" id="jobs"></div></section>
+    <section id="s-jobs"><h2>Jobs</h2><div class="scroll" id="jobs"></div>
+      <details id="addjob" style="margin-top:10px"><summary style="cursor:pointer;color:var(--acc)">Add a job</summary>
+        <p class="lead" style="margin-top:8px">Run a skill or a prompt on a schedule. The daemon picks it up within a few seconds. Permissions beyond the skill's own (<code>--allow</code>) are set with <code>noskill schedule add</code>.</p>
+        <form class="addf" id="jobf" autocomplete="off">
+          <label for="job-target" class="mute">What</label><input id="job-target" type="text" spellcheck="false" list="job-skills" placeholder="a skill name, or a sentence to run" required>
+          <datalist id="job-skills"></datalist>
+          <label for="job-kind" class="mute">When</label>
+          <span class="row"><select id="job-kind" aria-label="Schedule kind"><option value="every">every</option><option value="cron">cron</option></select>
+            <input id="job-when" type="text" spellcheck="false" placeholder="6h, 30m, 1d" required style="flex:1;min-width:8em"></span>
+          <label for="job-name" class="mute">Name</label><input id="job-name" type="text" placeholder="optional">
+          <label for="job-prompt" class="mute">Task</label><input id="job-prompt" type="text" placeholder="optional: what a skill job should do (default: the skill's own task)">
+          <label for="job-only" class="mute">Only when</label><input id="job-only" type="text" spellcheck="false" placeholder="optional: volume:RED, ac-power, unmetered, window:01:00-06:00 (comma-separated)">
+          <span></span><label class="row"><input type="checkbox" id="job-notify" checked> tell me the result (OS notification)</label>
+          <span></span><span class="row"><button class="go" id="job-go" type="submit">Add job</button><span id="job-msg" role="status"></span></span>
+        </form></details></section>
     <section id="s-skills"><h2>Skills</h2><div class="scroll" id="skills"></div></section>
-    <section class="wide" id="s-models"><h2>Models</h2><div class="scroll" id="models"></div></section>
+    <section class="wide" id="s-models"><h2>Models</h2><div id="mtask"></div><div class="scroll" id="models"></div>
+      <p class="lead" style="margin:8px 0 0">Bench times a model and runs the quick quality check (a few minutes at most); it unloads the model first. One action runs at a time, and none starts while a scheduled job is running.</p></section>
     <section id="s-learning"><h2>Learning</h2><div class="scroll" id="learning"></div><h2 style="margin-top:14px">Evaluation</h2><div class="scroll" id="eval"></div></section>
   </div>
   <div class="tabpanel" id="p-approvals" role="tabpanel" aria-labelledby="tab-approvals">
@@ -207,16 +222,18 @@ function render(d) {
     el("span", {class: r.outcome === "success" ? "ok" : r.outcome === "fail" ? "bad" : (r.status === "done" ? "" : "warn")}, r.outcome || r.status),
     (r.ms / 1000).toFixed(1) + " s · " + r.tokens + " tok"])) || empty("No runs yet."));
 
-  put("models", table(["Model", "Size", "Speed", "Cold load", "Quality by task type", ""], s.models.map(m => [
+  put("models", table(["Model", "Size", "Speed", "Cold load", "Quality by task type", "", "Actions"], s.models.map(m => [
     m.name, m.size_gb.toFixed(1) + " GB",
     m.tok_s ? m.tok_s.toFixed(0) + " tok/s" : el("span", {class: "mute"}, "not benched"),
     m.load_s ? m.load_s.toFixed(1) + " s" : "",
     m.quality ? el("span", {class: "row"}, Object.keys(m.quality).sort().map(k => el("span", {title: k + " " + m.quality[k].toFixed(2)},
       el("span", {class: "q"}, el("i", {style: "width:" + Math.round(m.quality[k] * 100) + "%"})), k))) : "",
-    m.loaded ? chip("loaded", "ok") : ""])) || empty("No models found. Is Ollama running?"));
+    m.loaded ? chip("loaded", "ok") : "", modelActions(m)])) || empty("No models found. Is Ollama running?"));
   const bad = s.backends.filter(b => !b.ok);
   if (bad.length) $("models").prepend(el("div", {class: "bad"}, bad.map(b => b.id + ": " + b.error)));
 
+  const sl = $("job-skills"), names = s.skills.map(k => k.name).join(",");
+  if (sl.dataset.n !== names) { sl.replaceChildren(...s.skills.map(k => el("option", {value: k.name}))); sl.dataset.n = names; }
   put("skills", table(["Skill", "Origin", "Status", "Used", "Success"], s.skills.map(k => [
     el("span", {}, k.name, k.review ? el("div", {class: "warn"}, k.review) : null),
     k.origin, k.status === "active" ? "active" : chip(k.status, "warn"),
@@ -226,6 +243,72 @@ function render(d) {
     l.kind, l.reason || "", l.status, el("span", {class: l.status === "failed" ? "bad" : "mute"}, l.result || l.last_error || "")])) || empty("Nothing queued."));
   put("eval", table(["When", "Model", "Suite", "Passed"], s.eval.map(e => [
     ago(e.started_at), e.model, e.suite, e.passed + "/" + e.tasks])) || empty("No eval runs. Try noskill eval run."));
+}
+
+// ---- add a job (POST /noskill/v1/jobs: the same checks as `noskill schedule add`) ----
+$("job-kind").onchange = () => { $("job-when").placeholder = $("job-kind").value === "cron" ? '0 3 * * *   (minute hour day month weekday, local time)' : "6h, 30m, 1d"; };
+$("jobf").onsubmit = async e => {
+  e.preventDefault();
+  const msg = $("job-msg"), go = $("job-go");
+  const body = {target: $("job-target").value, name: $("job-name").value, prompt: $("job-prompt").value,
+    when: $("job-only").value.split(",").map(x => x.trim()).filter(Boolean), notify: $("job-notify").checked ? ["os"] : []};
+  body[$("job-kind").value] = $("job-when").value;
+  go.disabled = true; msg.className = "mute"; msg.textContent = "adding…";
+  const r = await api("/noskill/v1/jobs", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  let j = {}; try { j = await r.json(); } catch (x) {}
+  go.disabled = false;
+  if (r.ok) {
+    msg.className = "ok"; msg.textContent = "Added " + (j.job && j.job.name || "the job") + ", next run " + (j.job ? ago(j.job.next_run_at) : "");
+    for (const id of ["job-target", "job-name", "job-prompt", "job-only"]) $(id).value = "";
+    refresh();
+  } else { msg.className = "bad"; msg.textContent = (j.error && j.error.message) || "Couldn't add it (" + r.status + ")"; }
+};
+
+// ---- model actions: bench, speed only, tool check, checked tasks (tasks.go) ----
+let tasks = [], taskErr = "";
+const dismissed = new Set();
+const running = () => tasks.find(t => t.state === "running");
+const KINDS = {bench: "Bench", speed: "Speed only", probe: "Tool check", checks: "Run checks"};
+const HINTS = {
+  bench: "Speed, memory and cold-load time, then the quick quality check per task type",
+  speed: "Speed, memory and cold-load time only",
+  probe: "Does this model call tools natively or does it need the constrained mode?",
+  checks: "The checked files tasks (the agent loop with real tools); about 10 s a task on granite4:3b"};
+function modelActions(m) {
+  if (!m.chat) return el("span", {class: "mute"}, "not a chat model");
+  if (m.excluded) return el("span", {class: "chip mute", title: "Listed in orchestrator.exclude: noskill never loads or times it"}, "excluded");
+  const busy = !!running();
+  const btn = (kind, label, cls) => {
+    const attrs = {class: cls || "", title: HINTS[kind], onclick: () => startTask(kind, m)};
+    if (busy) attrs.disabled = "";
+    return el("button", attrs, label);
+  };
+  return el("span", {class: "row"}, btn("bench", m.tok_s ? "Re-bench" : "Bench", m.tok_s ? "" : "go"), btn("speed", "Speed only"), btn("probe", "Tool check"), btn("checks", "Run checks"));
+}
+async function startTask(kind, m) {
+  if (m.loaded && (kind === "bench" || kind === "speed") && !confirm(m.name + " is loaded right now. Timing it unloads it first and loads it again. Go on?")) return;
+  const r = await api("/noskill/v1/tasks", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({kind, model: m.name})});
+  if (!r.ok) { let msg = r.status + ""; try { msg = (await r.json()).error.message || msg; } catch (e) {} taskErr = msg; renderTask(); return; }
+  taskErr = "";
+  refresh();
+}
+function renderTask() {
+  const t = tasks[0];
+  const err = taskErr ? el("div", {class: "bad", role: "alert"}, taskErr) : null;
+  if (!t) { put("mtask", err); return; }
+  const cls = t.state === "done" ? "ok" : t.state === "failed" ? "bad" : t.state === "running" ? "" : "warn";
+  const text = t.state === "running" ? (t.lines.slice(-6).join("\n") || "starting…") : (t.result || t.error || t.lines.slice(-6).join("\n"));
+  put("mtask", el("div", {class: "appr", role: "status"},
+    el("div", {class: "row"}, chip(KINDS[t.kind] || t.kind), el("b", {}, t.model), el("span", {class: cls}, t.state === "running" ? "running…" : t.state), el("span", {class: "mute"}, ago(t.ended || t.started)),
+      el("span", {style: "flex:1"}),
+      t.state === "running" ? el("button", {onclick: async () => { await api("/noskill/v1/tasks/" + t.id + "/stop", {method: "POST"}); refresh(); }}, "Stop") : el("button", {onclick: () => { dismissed.add(t.id); tasks = tasks.filter(x => x.id !== t.id); renderTask(); }}, "Dismiss")),
+    el("pre", {class: "msg"}, text), err));
+}
+async function loadTasks() {
+  try {
+    const r = await api("/noskill/v1/tasks");
+    if (r.ok) { tasks = ((await r.json()).tasks || []).filter(t => !dismissed.has(t.id)); renderTask(); }
+  } catch (e) { /* the status call reports a lost server */ }
 }
 
 // ---- tabs (Overview, Approvals, Downloads, History) ----
@@ -333,6 +416,7 @@ async function refresh() {
     if (r.status === 403) { $("app").hidden = false; $("login").style.display = "none"; put("approvals", el("div", {class: "bad"}, "This token isn't an admin token. Add admin = true to it in [[server.tokens]].")); return; }
     $("login").style.display = "none"; $("app").hidden = false;
     const d = await r.json();
+    await loadTasks();
     render(d);
     if (!shown) { // first load: the tab in the address, else Approvals when something waits, else Overview
       const h = location.hash.slice(1);
@@ -347,7 +431,7 @@ async function refresh() {
   } catch (e) {
     $("sub").textContent = "can't reach noskill: " + e.message;
   }
-  timer = setTimeout(refresh, 4000);
+  timer = setTimeout(refresh, running() ? 1500 : 4000);
 }
 $("tokgo").onclick = () => {
   token = $("tok").value.trim();

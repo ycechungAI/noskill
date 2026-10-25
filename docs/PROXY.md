@@ -41,10 +41,14 @@ How chat apps, editors and scripts get skills without changing anything but a UR
 | `GET /approvals`, `POST /approvals/{id}` | List; `{action: "approve"\|"skip", fields?: {name: value}, note?}` |
 | `GET /events` | Server-sent events: approval created/resolved, run finished. For the tray and status page |
 | `GET /status` | **Admin.** One snapshot: loaded model, backends, models with speed and quality scores, jobs, approvals, recent runs, skills, learning queue, eval runs |
+| `POST /noskill/v1/jobs` | **Admin.** Add a scheduled job: `{target, every \| cron, name?, prompt?, model?, when?, notify?}`, the same checks and defaults as `noskill schedule add` (FR-J1). `--allow` scopes stay CLI-only. The status page's "Add a job" form sends this |
 | `POST /jobs/{id}/{pause\|resume\|run}`, `POST /jobs/all/{pause\|resume}` | **Admin.** Job control for the tray and the status page. `all` pauses every enabled job and remembers which, so resuming doesn't wake the ones you had paused |
 | `GET /noskill/v1/downloads` | **Admin.** The Downloads and History tabs' data: whether ask-first is on, the ask mode, the downloads waiting for your yes and those you added, finished torrents not yet filed, recently filed files, and folder suggestions |
 | `POST /noskill/v1/downloads` | **Admin.** `{url, dest?, name?}`: add a download by hand (a magnet link, an https `.torrent` link or a Nyaa page; anything else is refused). Filed in `dest` when it finishes |
 | `POST /noskill/v1/downloads/file-now` | **Admin.** Stop finished downloads seeding and file them now |
+| `GET /noskill/v1/tasks` | **Admin.** The model actions started from the status page (the last 8): `kind`, `model`, `state` (running, done, failed, stopped), progress `lines` and the `result` |
+| `POST /noskill/v1/tasks` | **Admin.** `{kind, model}` with kind `bench` (speed, memory and the quick quality check: `models bench`), `speed` (`--perf-only`), `probe` (`models probe`) or `checks` (the checked `files` tasks: `eval run --type files`). Answers 202. One runs at a time (409), none starts while a scheduled job runs (409), and a model in `orchestrator.exclude` is refused (409) because a bench unloads and loads it (FR-B4) |
+| `POST /noskill/v1/tasks/{id}/stop` | **Admin.** Cancel a running task |
 | `GET /ui` (outside `/noskill/v1`) | The status page: static HTML, no token needed to load it; its calls carry the token ([ADR-0011](adr/0011-tray-and-status-page-over-http.md)). Four tabs: **Overview** (jobs, skills, models, learning), **Approvals** (everything waiting for you), **Downloads** (planning ahead, finished downloads, add a download) and **History** (what was filed, what was asked and answered, recent runs). The address keeps the tab (`/ui#history`) |
 
 **Admin** means a `[[server.tokens]]` entry with `admin = true`, or the `local` client when no tokens are set. Admins also see every approval and may approve ones that need `exec`.
@@ -56,7 +60,7 @@ The CLI doesn't use this API: it reads and writes the database directly ([ADR-00
 | Name | Effect |
 |---|---|
 | `noskill/auto` | The orchestrator picks the model; skills are selected automatically |
-| `noskill/fast`, `noskill/best` | Same as `noskill/auto`, routed under the `fast` or `best` preset. With a rule limited to a preset (`when = { needs = ["tools"], preset = "best" }`, [CONFIG.md](CONFIG.md)) one model is the fast default and another the quality choice |
+| `noskill/fast`, `noskill/best` | Same as `noskill/auto`, routed under the `fast` or `best` preset. A rule can be limited to a preset (`preset = "best"` in its `when`, [CONFIG.md](CONFIG.md)) to send that preset to a different model |
 | `noskill/<skill>` (e.g. `noskill/research`) | Forces that skill; model still routed. Only skills listed in `server.expose_skills` appear in model lists |
 | `noskill/<model>` (e.g. `noskill/qwen3:8b`) | Pins the model; skills on. A name containing `:` is always a model, because skill names can't contain `:` |
 | `qwen3:8b` (plain) | Straight to the backend, no skills, no routing (`server.passthrough_plain_names = true`) |
@@ -248,7 +252,7 @@ noskill is an OpenAI-compatible provider, so any tool that takes a custom OpenAI
       "options": { "baseURL": "http://127.0.0.1:11435/v1", "apiKey": "{env:NOSKILL_TOKEN}" },
       "models": {
         "noskill/fast": { "name": "noskill fast (granite4:3b)", "limit": { "context": 8192, "output": 4096 } },
-        "noskill/best": { "name": "noskill best (qwen3.5:4b)", "limit": { "context": 8192, "output": 4096 } },
+        "noskill/best": { "name": "noskill best (set by your preset rule)", "limit": { "context": 8192, "output": 4096 } },
         "noskill/auto": { "name": "noskill auto", "limit": { "context": 8192, "output": 4096 } }
       }
     }
@@ -256,7 +260,7 @@ noskill is an OpenAI-compatible provider, so any tool that takes a custom OpenAI
 }
 ```
 
-- **Which model answers:** `noskill/fast` and `noskill/best` use the models your preset rules name. The labels above are the measured choice on the project's machine (2026-10-18): `granite4:3b` for speed (9 of 10 checked `files` tasks at 9 s, 2.9 GB), `qwen3.5:4b` for performance (10 of 10 at 14 s, 4.2 GB), `gemma3:1b` as the low-memory backup for summarise and extract (10 of 11, 957 MB, no tools). Change the rules, not the client, to swap one.
+- **Which model answers:** `noskill/fast` and `noskill/best` use the models your preset rules name. The labels above are the measured choice on the project's machine (2026-10-18): `granite4:3b` for speed (9 of 10 checked `files` tasks at 9 s, 2.9 GB), `gemma3:1b` as the low-memory backup for summarise and extract (10 of 11, 957 MB, no tools). Change the rules, not the client, to swap one.
 - **Context:** noskill sends 8k to local models by default (`orchestrator.default_ctx`), so the limits above are 8192 and not what a hosted model offers. A coding agent that needs more should raise `default_ctx` and the model's limit together, and check the memory budget first.
 - **Tools:** the client's own tool definitions are dropped inside noskill for now (the `X-Noskill-Tools-Dropped` header says so); noskill runs its skills' tools itself.
 - **Other providers:** noskill talks to Ollama, LM Studio and other OpenAI-compatible servers as backends (`[[backends]]` in [CONFIG.md](CONFIG.md)); it isn't a way to reach a hosted provider, and no cloud fallback is built.

@@ -45,6 +45,9 @@ type ModelStatus struct {
 	LoadS    float64            `json:"load_s,omitempty"`
 	MemGB    float64            `json:"mem_gb,omitempty"`
 	Quality  map[string]float64 `json:"quality,omitempty"`
+	// Chat is false for embedding models, which can't be benched; Excluded is orchestrator.exclude.
+	Chat     bool `json:"chat"`
+	Excluded bool `json:"excluded,omitempty"`
 }
 
 type BackendStatus struct {
@@ -97,7 +100,7 @@ func (a *App) Status(ctx context.Context) Status {
 		Approvals: []approvals.Item{}, Runs: []RunStatus{}, Skills: []SkillStatus{}, Learning: []store.LearnItem{}, Eval: []store.EvalRun{}}
 	ms, errs := a.Models(ctx)
 	for _, m := range ms {
-		x := ModelStatus{Name: m.Name, Backend: m.NB.ID, SizeGB: float64(m.SizeBytes) / 1e9, Loaded: m.Loaded && m.chat(), Strategy: string(m.Strategy)}
+		x := ModelStatus{Name: m.Name, Backend: m.NB.ID, SizeGB: float64(m.SizeBytes) / 1e9, Loaded: m.Loaded && m.chat(), Strategy: string(m.Strategy), Chat: m.chat(), Excluded: slices.Contains(a.Cfg.Orchestrator.Exclude, m.Name)}
 		for _, c := range m.Capabilities {
 			x.Caps = append(x.Caps, string(c))
 		}

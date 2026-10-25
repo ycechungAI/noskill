@@ -2,12 +2,13 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
+	"noskill/internal/app"
 	"noskill/internal/scheduler"
 )
 
@@ -61,101 +62,25 @@ func scheduleAdd(c *cmd, ctx context.Context, args []string) int {
 	if len(pos) != 1 || strings.TrimSpace(pos[0]) == "" {
 		return c.usageErr(`usage: noskill schedule add <skill|"prompt"> --cron "<expr>" | --every <dur> [--name n] [--prompt p] [--notify os,ntfy]`)
 	}
-	var pre []string
-	for _, w := range when {
-		p, err := scheduler.ParsePrecondition(w)
-		if err != nil {
-			return c.usageErr("%v", err)
-		}
-		if !slices.Contains(pre, p) {
-			pre = append(pre, p)
-		}
-	}
-	var sched scheduler.Schedule
-	switch {
-	case *cronExpr != "" && *every != "":
-		return c.usageErr("use --cron or --every, not both")
-	case *cronExpr != "":
-		if sched, err = scheduler.ParseCron(*cronExpr); err != nil {
-			return c.usageErr("%v", err)
-		}
-	case *every != "":
-		if sched, err = scheduler.ParseEvery(*every); err != nil {
-			return c.usageErr("%v", err)
-		}
-	default:
-		return c.usageErr(`say when: --cron "0 3 * * *" or --every 6h`)
-	}
 	a, err := c.open(ctx)
 	if err != nil {
 		return c.fail(err)
 	}
 	defer a.Close()
-	sc := a.Cfg.Scheduler
-	j := scheduler.Job{Schedule: sched.String(), Missed: sc.MissedPolicy, Overlap: *overlap, Timeout: sc.DefaultTimeout.Duration,
-		Retries: sc.Retries, Enabled: !*paused, CreatedAt: time.Now(), Args: scheduler.Args{Prompt: *prompt, Allow: allow, Model: *model},
-		Preconditions: pre}
-	if *missed != "" {
-		j.Missed = *missed
-	}
-	if j.Missed != "skip" && j.Missed != "once" {
-		return c.usageErr("--missed must be once or skip")
-	}
-	if j.Overlap != "skip" && j.Overlap != "queue" {
-		return c.usageErr("--overlap must be skip or queue")
-	}
-	if *timeout != "" {
-		d, err := scheduler.ParseEvery(*timeout)
-		if err != nil {
-			return c.usageErr("--timeout: want a duration of a minute or more, like 30m")
-		}
-		j.Timeout = d.D
-	}
+	spec := app.JobSpec{Target: pos[0], Cron: *cronExpr, Every: *every, Name: *name, Prompt: *prompt, Model: *model,
+		Allow: allow, When: when, Missed: *missed, Overlap: *overlap, Timeout: *timeout, Paused: *paused}
 	if *retries >= 0 {
-		j.Retries = *retries
+		spec.Retries = retries
 	}
-	if j.Retries > 10 {
-		return c.usageErr("--retries: 10 at most")
+	if *notifyTo != "none" {
+		spec.Notify = splitComma(*notifyTo)
 	}
-	if *notifyTo != "none" && *notifyTo != "" {
-		known := map[string]bool{"os": true, "ntfy": true, "telegram": true, "discord": true, "email": true}
-		for _, n := range splitComma(*notifyTo) {
-			if !known[n] {
-				return c.usageErr("--notify: %q isn't a channel (os, ntfy, telegram, discord, email, none)", n)
-			}
-			j.Notify = append(j.Notify, n)
+	j, err := a.AddJob(ctx, spec)
+	if err != nil {
+		var ue *app.UserError
+		if errors.As(err, &ue) {
+			return c.usageErr("%v", err)
 		}
-	}
-
-	target := strings.TrimSpace(pos[0])
-	if s, ok := a.Skills.Get(target); ok {
-		j.TargetKind, j.Target = "skill", s.Name
-		if s.NeedsApproval() {
-			return c.fail(fmt.Errorf("skill %s comes from a project folder; review and `noskill skills enable %s` first", s.Name, s.Name))
-		}
-	} else if len(strings.Fields(target)) == 1 && !strings.ContainsAny(target, "?.!") {
-		return c.usageErr("no skill named %q (see `noskill skills list`); to schedule a prompt, write it in quotes as a sentence", target)
-	} else {
-		j.TargetKind, j.Target = "prompt", target
-		if *prompt != "" {
-			return c.usageErr("--prompt is for skill jobs; this job is already a prompt")
-		}
-	}
-	if *model != "" {
-		if _, err := a.FindModel(ctx, *model); err != nil {
-			return c.fail(err)
-		}
-	}
-	j.Name = *name
-	if j.Name == "" {
-		j.Name = jobName(j)
-	}
-	j.NextRunAt = sched.Next(time.Now())
-	if j.NextRunAt.IsZero() {
-		return c.usageErr("that schedule never comes round")
-	}
-	st := &scheduler.Store{DB: a.DB}
-	if j, err = st.Add(ctx, j); err != nil {
 		return c.fail(err)
 	}
 	if c.g.json {
@@ -183,28 +108,6 @@ func scheduleAdd(c *cmd, ctx context.Context, args []string) int {
 	}
 	c.daemonHint(ctx)
 	return ExitOK
-}
-
-// jobName makes a short name from the target: the skill name, or the prompt's first words.
-func jobName(j scheduler.Job) string {
-	if j.TargetKind == "skill" {
-		return j.Target
-	}
-	var words []string
-	for _, w := range strings.Fields(strings.ToLower(j.Target)) {
-		w = strings.Trim(w, `.,!?:;"'()`)
-		if w != "" {
-			words = append(words, w)
-		}
-		if len(words) == 4 {
-			break
-		}
-	}
-	n := strings.Join(words, "-")
-	if n == "" {
-		n = "job"
-	}
-	return n
 }
 
 func splitComma(s string) []string {

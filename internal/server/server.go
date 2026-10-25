@@ -28,6 +28,7 @@ type Server struct {
 	cfg     config.Server
 	auth    *Auth
 	Version string
+	tasks   taskBook // model actions started from the status page (tasks.go)
 }
 
 // New builds the server. Tokens named "secret:NAME" are read from the keychain.
@@ -85,7 +86,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /noskill/v1/approvals/{id}", s.answerApproval)
 	mux.HandleFunc("GET /noskill/v1/events", s.events)
 	mux.HandleFunc("GET /noskill/v1/status", s.admin(s.status))
+	mux.HandleFunc("POST /noskill/v1/jobs", s.admin(s.addJob))
 	mux.HandleFunc("POST /noskill/v1/jobs/{id}/{action}", s.admin(s.jobAction))
+	mux.HandleFunc("GET /noskill/v1/tasks", s.admin(s.listTasks))
+	mux.HandleFunc("POST /noskill/v1/tasks", s.admin(s.startTask))
+	mux.HandleFunc("POST /noskill/v1/tasks/{id}/stop", s.admin(s.stopTask))
 	mux.HandleFunc("GET /noskill/v1/downloads", s.admin(s.downloads))
 	mux.HandleFunc("POST /noskill/v1/downloads", s.admin(s.addDownload))
 	mux.HandleFunc("POST /noskill/v1/downloads/file-now", s.admin(s.fileNow))

@@ -843,3 +843,90 @@ func TestDownloadsEndpoints(t *testing.T) {
 		t.Error("the page lacks the tabs or the add form")
 	}
 }
+
+func TestModelActionsFromTheStatusPage(t *testing.T) {
+	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {
+		c.Server.Tokens = []config.Token{{Name: "chat", Token: "secret:C"}, {Name: "tray", Token: "secret:T", Admin: true}}
+	}, map[string]string{"C": "chat-token-0123456789", "T": "tray-token-0123456789"})
+	chat := map[string]string{"Authorization": "Bearer chat-token-0123456789"}
+	tray := map[string]string{"Authorization": "Bearer tray-token-0123456789"}
+
+	for _, c := range []struct{ method, path string }{{"GET", "/noskill/v1/tasks"}, {"POST", "/noskill/v1/tasks"}, {"POST", "/noskill/v1/tasks/t1/stop"}} {
+		if resp, _ := g.do(c.method, c.path, map[string]string{"kind": "probe", "model": "qwen3:4b"}, nil); resp.StatusCode != 401 {
+			t.Errorf("%s %s without a token: %d", c.method, c.path, resp.StatusCode)
+		}
+		if resp, _ := g.do(c.method, c.path, map[string]string{"kind": "probe", "model": "qwen3:4b"}, chat); resp.StatusCode != 403 {
+			t.Errorf("%s %s for a chat token: %d", c.method, c.path, resp.StatusCode)
+		}
+	}
+	if resp, body := g.do("POST", "/noskill/v1/tasks", map[string]string{"kind": "format", "model": "qwen3:4b"}, tray); resp.StatusCode != 400 {
+		t.Errorf("unknown kind: %d %s", resp.StatusCode, body)
+	}
+	if resp, body := g.do("POST", "/noskill/v1/tasks", map[string]string{"kind": "bench", "model": "nope:1b"}, tray); resp.StatusCode != 404 {
+		t.Errorf("unknown model: %d %s", resp.StatusCode, body)
+	}
+
+	// A model in orchestrator.exclude is never loaded or timed from the page either.
+	g.app.Cfg.Orchestrator.Exclude = []string{"qwen3:4b"}
+	if resp, body := g.do("POST", "/noskill/v1/tasks", map[string]string{"kind": "bench", "model": "qwen3:4b"}, tray); resp.StatusCode != 409 || !strings.Contains(string(body), "orchestrator.exclude") {
+		t.Errorf("excluded model: %d %s", resp.StatusCode, body)
+	}
+	g.app.Cfg.Orchestrator.Exclude = nil
+
+	// A task starts, ends and stays in the list.
+	resp, body := g.do("POST", "/noskill/v1/tasks", map[string]string{"kind": "probe", "model": "qwen3:4b"}, tray)
+	if resp.StatusCode != 202 {
+		t.Fatalf("start: %d %s", resp.StatusCode, body)
+	}
+	var state string
+	for i := 0; i < 100 && state != "done" && state != "failed"; i++ {
+		time.Sleep(50 * time.Millisecond)
+		_, body = g.do("GET", "/noskill/v1/tasks", nil, tray)
+		var v struct {
+			Tasks []struct{ ID, Kind, Model, State string } `json:"tasks"`
+		}
+		if json.Unmarshal(body, &v) != nil || len(v.Tasks) != 1 || v.Tasks[0].Kind != "probe" || v.Tasks[0].Model != "qwen3:4b" {
+			t.Fatalf("tasks: %s", body)
+		}
+		state = v.Tasks[0].State
+	}
+	if state != "done" && state != "failed" {
+		t.Fatalf("the probe never finished: %s", body)
+	}
+}
+
+func TestAddJobFromTheStatusPage(t *testing.T) {
+	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {
+		c.Server.Tokens = []config.Token{{Name: "chat", Token: "secret:C"}, {Name: "tray", Token: "secret:T", Admin: true}}
+	}, map[string]string{"C": "chat-token-0123456789", "T": "tray-token-0123456789"})
+	chat := map[string]string{"Authorization": "Bearer chat-token-0123456789"}
+	tray := map[string]string{"Authorization": "Bearer tray-token-0123456789"}
+	spec := map[string]any{"target": "Summarise my notes folder please", "every": "6h", "notify": []string{"os"}}
+
+	if resp, _ := g.do("POST", "/noskill/v1/jobs", spec, nil); resp.StatusCode != 401 {
+		t.Errorf("without a token: %d", resp.StatusCode)
+	}
+	if resp, _ := g.do("POST", "/noskill/v1/jobs", spec, chat); resp.StatusCode != 403 {
+		t.Errorf("for a chat token: %d", resp.StatusCode)
+	}
+	for name, bad := range map[string]map[string]any{
+		"no schedule":     {"target": "Summarise my notes folder please"},
+		"both schedules":  {"target": "Summarise my notes folder please", "every": "6h", "cron": "0 3 * * *"},
+		"bad cron":        {"target": "Summarise my notes folder please", "cron": "99 * * * *"},
+		"unknown skill":   {"target": "nosuchskill", "every": "6h"},
+		"unknown channel": {"target": "Summarise my notes folder please", "every": "6h", "notify": []string{"pigeon"}},
+		"bad condition":   {"target": "Summarise my notes folder please", "every": "6h", "when": []string{"full-moon"}},
+	} {
+		if resp, body := g.do("POST", "/noskill/v1/jobs", bad, tray); resp.StatusCode != 400 {
+			t.Errorf("%s: %d %s", name, resp.StatusCode, body)
+		}
+	}
+	resp, body := g.do("POST", "/noskill/v1/jobs", spec, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"summarise-my-notes-folder"`) {
+		t.Fatalf("add: %d %s", resp.StatusCode, body)
+	}
+	_, body = g.do("GET", "/noskill/v1/status", nil, tray)
+	if !strings.Contains(string(body), `"name":"summarise-my-notes-folder"`) || !strings.Contains(string(body), "every:6h") {
+		t.Errorf("the job isn't in the status: %s", body)
+	}
+}

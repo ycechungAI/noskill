@@ -2,7 +2,10 @@ package server
 
 import (
 	_ "embed"
+	"encoding/json"
 	"net/http"
+
+	"noskill/internal/app"
 )
 
 // The status page and the calls the tray makes (FR-I6, FR-I7, ADR-0011).
@@ -24,6 +27,26 @@ func (s *Server) admin(next http.HandlerFunc) http.HandlerFunc {
 
 func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"version": s.Version, "status": s.App.Status(r.Context())})
+}
+
+// addJob: a JobSpec (app.JobSpec) as JSON, the same checks as `noskill schedule add`. The daemon
+// picks the job up from the database within a few seconds (FR-J1).
+func (s *Server) addJob(w http.ResponseWriter, r *http.Request) {
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	var in app.JobSpec
+	if err := json.Unmarshal(body, &in); err != nil {
+		s.fail(w, r, bad(`send {"target": a skill or a prompt, "every": "6h" or "cron": "0 3 * * *", "name"?, "prompt"?, "when"?, "notify"?}`))
+		return
+	}
+	j, err := s.App.AddJob(r.Context(), in)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "job": j})
 }
 
 // jobAction: pause | resume | run for one job, or job "all" with pause | resume.
