@@ -27,6 +27,7 @@ items() {
 install|Setup|Build and install noskill (and Go, Ollama, models if missing)|@install||
 ollama|Setup|Install Ollama if missing and download the recommended models|@ollama||
 ui|Use|Status page: approvals, downloads, history|ui||
+web|Use|Docs site and Phase 0 spike status, in one run|@web||
 approvals|Use|What is waiting for your yes|approvals||
 run|Use|Run one task|run {}|What should noskill do?|
 chat|Use|Chat in the terminal|chat||
@@ -257,6 +258,7 @@ $line
 EOF2
   case "$tpl" in
     @readme) ${PAGER:-cat} "$here/docs/START.md"; return ;;
+    @web) if [ "$dry" = 1 ]; then echo "(in $here) ./web.sh"; return; fi; (cd "$here" && ./web.sh "$@"); return ;;
     @install) install_noskill "$@"; return ;;
     @ollama) if [ "$dry" = 1 ]; then echo "check for Ollama (install it if missing), then ollama pull the recommended models"; return; fi; y=0; [ "${1:-}" = -y ] && y=1; setup_ollama "$y"; return ;;
     @vet)

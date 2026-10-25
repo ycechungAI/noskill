@@ -24,6 +24,7 @@ $table = @'
 install|Setup|Build and install noskill (and Go, Ollama, models if missing)|@install||
 ollama|Setup|Install Ollama if missing and download the recommended models|@ollama||
 ui|Use|Status page: approvals, downloads, history|ui||
+web|Use|Docs site and Phase 0 spike status, in one run|@web||
 approvals|Use|What is waiting for your yes|approvals||
 run|Use|Run one task|run {}|What should noskill do?|
 chat|Use|Chat in the terminal|chat||
@@ -234,6 +235,11 @@ function RunItem([string]$key, [string[]]$more) {
   $tpl = $it.Tpl
   switch -Regex ($tpl) {
     "^@readme$" { Get-Content (Join-Path $here "docs\START.md"); return 0 }
+    "^@web$" {
+      if ($script:dry) { "(in $here) .\web.ps1"; return 0 }
+      Push-Location $here
+      try { & (Join-Path $here "web.ps1") @more; return $LASTEXITCODE } finally { Pop-Location }
+    }
     "^@install$" { return (InstallNoskill $more) }
     "^@ollama$" {
       if ($script:dry) { "check for Ollama (install it if missing), then ollama pull the recommended models"; return 0 }
