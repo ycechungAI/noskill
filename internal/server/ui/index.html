@@ -224,11 +224,13 @@ function render(d) {
 
   put("models", table(["Model", "Size", "Speed", "Cold load", "Quality by task type", "", "Actions"], s.models.map(m => [
     m.name, m.size_gb.toFixed(1) + " GB",
-    m.tok_s ? m.tok_s.toFixed(0) + " tok/s" : el("span", {class: "mute"}, "not benched"),
+    m.tok_s ? m.tok_s.toFixed(0) + " tok/s" : m.latency_ms ? m.latency_ms.toFixed(0) + " ms / " + (m.caps.includes("decide") ? "decision" : "text") : el("span", {class: "mute"}, "not benched"),
     m.load_s ? m.load_s.toFixed(1) + " s" : "",
     m.quality ? el("span", {class: "row"}, Object.keys(m.quality).sort().map(k => el("span", {title: k + " " + m.quality[k].toFixed(2)},
       el("span", {class: "q"}, el("i", {style: "width:" + Math.round(m.quality[k] * 100) + "%"})), k))) : "",
-    m.loaded ? chip("loaded", "ok") : "", modelActions(m)])) || empty("No models found. Is Ollama running?"));
+    m.loaded ? chip("loaded", "ok") : "", modelActions(m)]).concat((s.missing || []).map(x => [
+      el("span", {}, x.name, el("div", {class: "mute"}, x.role)), "≈ " + x.size_gb.toFixed(1) + " GB",
+      el("span", {class: "mute"}, "not installed"), "", "", "", pullButton(x.name)]))) || empty("No models found. Is Ollama running?"));
   const bad = s.backends.filter(b => !b.ok);
   if (bad.length) $("models").prepend(el("div", {class: "bad"}, bad.map(b => b.id + ": " + b.error)));
 
@@ -268,16 +270,29 @@ $("jobf").onsubmit = async e => {
 let tasks = [], taskErr = "";
 const dismissed = new Set();
 const running = () => tasks.find(t => t.state === "running");
-const KINDS = {bench: "Bench", speed: "Speed only", probe: "Tool check", checks: "Run checks"};
+const KINDS = {bench: "Bench", speed: "Speed only", probe: "Tool check", checks: "Run checks", pull: "Pull"};
 const HINTS = {
+  decide: "Decision suite: accuracy on obvious questions, calibration, reworded and shuffled inputs, hidden instructions, hedging, speed",
+  embed: "Speed, and whether each sentence lands closer to its paraphrase than to an unrelated one",
   bench: "Speed, memory and cold-load time, then the quick quality check per task type",
   speed: "Speed, memory and cold-load time only",
   probe: "Does this model call tools natively or does it need the constrained mode?",
   checks: "The checked files tasks (the agent loop with real tools); about 10 s a task on granite4:3b"};
+function pullButton(name) {
+  const attrs = {title: "Download " + name + " from the model registry", onclick: () => startTask("pull", {name})};
+  if (running()) attrs.disabled = "";
+  return el("button", attrs, "Pull");
+}
 function modelActions(m) {
-  if (!m.chat) return el("span", {class: "mute"}, "not a chat model");
+  if (!m.bench) return el("span", {class: "mute"}, "no benchmark for this kind yet");
   if (m.excluded) return el("span", {class: "chip mute", title: "Listed in orchestrator.exclude: noskill never loads or times it"}, "excluded");
   const busy = !!running();
+  if (!m.chat) {
+    // A decision (JEV) or embedding model: one benchmark that times it and checks its answers.
+    const attrs = {class: m.tok_s || m.latency_ms ? "" : "go", title: m.caps.includes("decide") ? HINTS.decide : HINTS.embed, onclick: () => startTask("bench", m)};
+    if (busy) attrs.disabled = "";
+    return el("span", {class: "row"}, el("button", attrs, m.latency_ms ? "Re-bench" : "Bench"));
+  }
   const btn = (kind, label, cls) => {
     const attrs = {class: cls || "", title: HINTS[kind], onclick: () => startTask(kind, m)};
     if (busy) attrs.disabled = "";

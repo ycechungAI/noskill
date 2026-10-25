@@ -21,6 +21,7 @@ type Status struct {
 	At         time.Time        `json:"at"`
 	Primary    string           `json:"primary,omitempty"` // the loaded chat model
 	Models     []ModelStatus    `json:"models"`
+	Missing    []Staple         `json:"missing"` // staple models that aren't installed: the page offers to pull them
 	Backends   []BackendStatus  `json:"backends"`
 	Jobs       []JobStatus      `json:"jobs"`
 	JobsPaused bool             `json:"jobs_paused"` // "pause all" is in effect
@@ -45,9 +46,13 @@ type ModelStatus struct {
 	LoadS    float64            `json:"load_s,omitempty"`
 	MemGB    float64            `json:"mem_gb,omitempty"`
 	Quality  map[string]float64 `json:"quality,omitempty"`
-	// Chat is false for embedding models, which can't be benched; Excluded is orchestrator.exclude.
-	Chat     bool `json:"chat"`
-	Excluded bool `json:"excluded,omitempty"`
+	// Chat is false for decision and embedding models; Bench says the page can time and check the model
+	// anyway (they have their own benchmark); LatencyMs is a non-chat model's warm time per decision or
+	// per text. Excluded is orchestrator.exclude.
+	Chat      bool    `json:"chat"`
+	Bench     bool    `json:"bench"`
+	LatencyMs float64 `json:"latency_ms,omitempty"`
+	Excluded  bool    `json:"excluded,omitempty"`
 }
 
 type BackendStatus struct {
@@ -96,11 +101,11 @@ type SkillStatus struct {
 
 // Status gathers the snapshot. Parts that fail to load are left empty rather than failing the page.
 func (a *App) Status(ctx context.Context) Status {
-	st := Status{At: time.Now(), Models: []ModelStatus{}, Backends: []BackendStatus{}, Jobs: []JobStatus{},
+	st := Status{At: time.Now(), Models: []ModelStatus{}, Missing: []Staple{}, Backends: []BackendStatus{}, Jobs: []JobStatus{},
 		Approvals: []approvals.Item{}, Runs: []RunStatus{}, Skills: []SkillStatus{}, Learning: []store.LearnItem{}, Eval: []store.EvalRun{}}
 	ms, errs := a.Models(ctx)
 	for _, m := range ms {
-		x := ModelStatus{Name: m.Name, Backend: m.NB.ID, SizeGB: float64(m.SizeBytes) / 1e9, Loaded: m.Loaded && m.chat(), Strategy: string(m.Strategy), Chat: m.chat(), Excluded: slices.Contains(a.Cfg.Orchestrator.Exclude, m.Name)}
+		x := ModelStatus{Name: m.Name, Backend: m.NB.ID, SizeGB: float64(m.SizeBytes) / 1e9, Loaded: m.Loaded && m.chat(), Strategy: string(m.Strategy), Chat: m.chat(), Bench: m.chat() || m.CanBenchOther(), Excluded: slices.Contains(a.Cfg.Orchestrator.Exclude, m.Name)}
 		for _, c := range m.Capabilities {
 			x.Caps = append(x.Caps, string(c))
 		}
@@ -109,12 +114,16 @@ func (a *App) Status(ctx context.Context) Status {
 		}
 		if perf, ok, _ := a.DB.GetPerf(ctx, m.ID); ok {
 			x.TokPerS, x.LoadS, x.MemGB = perf.TokPerSec, perf.LoadMsCold/1000, float64(perf.MemBytes)/1e9
+			if !m.chat() {
+				x.LatencyMs = perf.TTFTMs
+			}
 		}
 		if sc, _, err := a.DB.Scores(ctx, m.ID); err == nil && len(sc) > 0 {
 			x.Quality = sc
 		}
 		st.Models = append(st.Models, x)
 	}
+	st.Missing = missingStaples(st.Models)
 	for _, nb := range a.Backends {
 		b := BackendStatus{ID: nb.ID, Kind: nb.Kind, OK: true}
 		for _, err := range errs {

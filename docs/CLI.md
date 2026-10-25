@@ -89,7 +89,7 @@ Built in block 5c (FR-S10, [ADR-0016](adr/0016-signed-skill-registry.md)). A reg
 | Command | Does |
 |---|---|
 | `noskill models list` | Backends, models, capabilities (incl. `decide`), loaded state, scores |
-| `noskill models bench <model> [--perf-only]` | Speed, memory, cold load, and a quality score per task type from a 12-task micro-eval (about 30 s on a 4B model). `--perf-only` skips the quality part. Decision latency/accuracy for JEV models isn't measured yet |
+| `noskill models bench <model> [--perf-only]` | Speed, memory, cold load, and a quality score per task type from a 12-task micro-eval (about 30 s on a 4B model). `--perf-only` skips the quality part. A JEV decision model gets the decision suite instead (accuracy on obvious questions, calibration, reworded and shuffled inputs, instructions hidden in the data, hedging on ambiguous input, determinism, one question against six in a call), and an embedding model the embedding suite (picking the right skill for a request, the same request in other languages, long paragraphs, paraphrases, batch speed). Scores land in the quality column as `decide-*` and `retrieval`, `mrr`, `cross-lingual`, `long-docs`, `paraphrase` |
 | `noskill route explain "<prompt>"` | Which model would be picked and why |
 | `noskill decide --model <m> --state '<json>' --questions '<json>'` | Raw decision call (debugging FR-B6) |
 | `noskill calibration [show]` | Per decision and model: decisions made and labelled, calibration error (ECE), Brier score, reliability bins, the threshold in force, the suggested one and recent changes (FR-B6c) |

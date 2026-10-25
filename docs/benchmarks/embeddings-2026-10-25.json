@@ -1,0 +1,140 @@
+{
+  "date": "2026-10-25",
+  "machine": "Apple M4, Ollama",
+  "suite": "internal/app/benchother.go (embedding suite)",
+  "results": {
+    "all-minilm": {
+      "kind": "embed",
+      "perf": {
+        "TokPerSec": 0,
+        "TTFTMs": 10.109512820512823,
+        "LoadMsCold": 596.939,
+        "LoadMsWarm": 0,
+        "MemBytes": 26046627,
+        "Ctx": 0,
+        "MeasuredAt": "2026-10-25T00:35:59.93914-04:00"
+      },
+      "scores": {
+        "cross-lingual": 0.16666666666666666,
+        "long-docs": 1,
+        "mrr": 0.9166666666666666,
+        "paraphrase": 1,
+        "retrieval": 0.875
+      }
+    },
+    "bge-m3": {
+      "kind": "embed",
+      "perf": {
+        "TokPerSec": 0,
+        "TTFTMs": 24.240358974358976,
+        "LoadMsCold": 1575.499,
+        "LoadMsWarm": 0,
+        "MemBytes": 689187061,
+        "Ctx": 0,
+        "MeasuredAt": "2026-10-25T00:47:43.360391-04:00"
+      },
+      "scores": {
+        "cross-lingual": 1,
+        "long-docs": 1,
+        "mrr": 0.6354166666666667,
+        "paraphrase": 1,
+        "retrieval": 0.375
+      }
+    },
+    "embeddinggemma": {
+      "kind": "embed",
+      "perf": {
+        "TokPerSec": 0,
+        "TTFTMs": 15.322128205128207,
+        "LoadMsCold": 1111.051,
+        "LoadMsWarm": 0,
+        "MemBytes": 685642874,
+        "Ctx": 0,
+        "MeasuredAt": "2026-10-25T00:44:00.256344-04:00"
+      },
+      "scores": {
+        "cross-lingual": 1,
+        "long-docs": 1,
+        "mrr": 0.9375,
+        "paraphrase": 1,
+        "retrieval": 0.875
+      }
+    },
+    "granite-embedding:278m": {
+      "kind": "embed",
+      "perf": {
+        "TokPerSec": 0,
+        "TTFTMs": 17.082769230769234,
+        "LoadMsCold": 1302.773,
+        "LoadMsWarm": 0,
+        "MemBytes": 185398721,
+        "Ctx": 0,
+        "MeasuredAt": "2026-10-25T00:41:58.764821-04:00"
+      },
+      "scores": {
+        "cross-lingual": 1,
+        "long-docs": 1,
+        "mrr": 0.6875,
+        "paraphrase": 1,
+        "retrieval": 0.5
+      }
+    },
+    "mxbai-embed-large": {
+      "kind": "embed",
+      "perf": {
+        "TokPerSec": 0,
+        "TTFTMs": 88.47582051282049,
+        "LoadMsCold": 822.235,
+        "LoadMsWarm": 0,
+        "MemBytes": 625129553,
+        "Ctx": 0,
+        "MeasuredAt": "2026-10-25T00:38:07.85096-04:00"
+      },
+      "scores": {
+        "cross-lingual": 0.6666666666666666,
+        "long-docs": 1,
+        "mrr": 0.9375,
+        "paraphrase": 1,
+        "retrieval": 0.875
+      }
+    },
+    "nomic-embed-text": {
+      "kind": "embed",
+      "perf": {
+        "TokPerSec": 0,
+        "TTFTMs": 16.1275641025641,
+        "LoadMsCold": 286.626,
+        "LoadMsWarm": 0,
+        "MemBytes": 335733063,
+        "Ctx": 0,
+        "MeasuredAt": "2026-10-25T00:35:49.429119-04:00"
+      },
+      "scores": {
+        "cross-lingual": 0.5,
+        "long-docs": 1,
+        "mrr": 0.9375,
+        "paraphrase": 1,
+        "retrieval": 0.875
+      }
+    },
+    "snowflake-arctic-embed:335m": {
+      "kind": "embed",
+      "perf": {
+        "TokPerSec": 0,
+        "TTFTMs": 27.699205128205122,
+        "LoadMsCold": 640.244,
+        "LoadMsWarm": 0,
+        "MemBytes": 625129553,
+        "Ctx": 0,
+        "MeasuredAt": "2026-10-25T00:40:12.499346-04:00"
+      },
+      "scores": {
+        "cross-lingual": 0.3333333333333333,
+        "long-docs": 1,
+        "mrr": 0.90625,
+        "paraphrase": 1,
+        "retrieval": 0.875
+      }
+    }
+  }
+}

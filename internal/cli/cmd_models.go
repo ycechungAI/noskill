@@ -183,6 +183,19 @@ func modelsBench(c *cmd, ctx context.Context, a *app.App, args []string) int {
 	if err != nil || len(names) != 1 {
 		return c.usageErr("usage: noskill models bench <model> [--perf-only]   (unloads the model first to time a cold load)")
 	}
+	if m, err := a.FindModel(ctx, names[0]); err == nil && !m.Has(backends.CapChat) {
+		// A decision (JEV) or embedding model: its own benchmark (FR-B4).
+		o, err := a.BenchOther(ctx, names[0], func(s string) { c.infof("  %s…\n", s) })
+		if err != nil {
+			return c.fail(err)
+		}
+		if c.g.json {
+			c.printJSON(map[string]any{"kind": o.Kind, "perf": o.Perf, "scores": o.Scores})
+			return ExitOK
+		}
+		c.outf("✓ %s: %s\n", names[0], o.Summary)
+		return ExitOK
+	}
 	p, err := a.Bench(ctx, names[0], func(s string) { c.infof("  %s…\n", s) })
 	if err != nil {
 		return c.fail(err)

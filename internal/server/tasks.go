@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"noskill/internal/app"
+	"noskill/internal/backends"
 	"noskill/internal/scheduler"
 )
 
@@ -25,6 +27,7 @@ const (
 	taskSpeed  = "speed"  // `models bench --perf-only`
 	taskProbe  = "probe"  // `models probe`
 	taskChecks = "checks" // `eval run --type files`: the checked agent tasks
+	taskPull   = "pull"   // `models pull`: download a model the user picked
 )
 
 type uiTask struct {
@@ -48,6 +51,8 @@ type taskBook struct {
 }
 
 const keepTasks = 8
+
+var validModelName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,100}(:[A-Za-z0-9._-]{1,50})?$`)
 
 func (b *taskBook) running() *uiTask {
 	for _, t := range b.recent {
@@ -101,20 +106,50 @@ func (s *Server) startTask(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, bad(`send {"kind": "bench" | "speed" | "probe" | "checks", "model": a model name}`))
 		return
 	}
-	if !slices.Contains([]string{taskBench, taskSpeed, taskProbe, taskChecks}, in.Kind) {
-		s.fail(w, r, bad("unknown kind %q (bench, speed, probe, checks)", in.Kind))
+	if !slices.Contains([]string{taskBench, taskSpeed, taskProbe, taskChecks, taskPull}, in.Kind) {
+		s.fail(w, r, bad("unknown kind %q (bench, speed, probe, checks, pull)", in.Kind))
 		return
 	}
 	ctx := r.Context()
+	if in.Kind == taskPull {
+		// The user picked the model and knows the disk it needs; only the name is checked.
+		name := strings.TrimSpace(in.Model)
+		if !validModelName.MatchString(name) {
+			s.fail(w, r, bad("%q isn't a model name (like granite4:3b)", name))
+			return
+		}
+		if slices.Contains(s.App.Cfg.Orchestrator.Exclude, name) {
+			apiError(w, r, http.StatusConflict, name+" is excluded in the config (orchestrator.exclude)")
+			return
+		}
+		s.startRun(w, r, in.Kind, name)
+		return
+	}
 	m, err := s.App.FindModel(ctx, in.Model)
 	if err != nil {
 		s.fail(w, r, err)
+		return
+	}
+	chat := m.Has(backends.CapChat)
+	switch {
+	case !chat && !m.CanBenchOther():
+		s.fail(w, r, bad("%s is not a chat, decision or embedding model; there is no benchmark for it yet", m.Name))
+		return
+	case !chat && in.Kind != taskBench && in.Kind != taskSpeed:
+		s.fail(w, r, bad("%s isn't a chat model: only Bench applies to it", m.Name))
 		return
 	}
 	if slices.Contains(s.App.Cfg.Orchestrator.Exclude, m.Name) {
 		apiError(w, r, http.StatusConflict, m.Name+" is excluded in the config (orchestrator.exclude), so noskill doesn't load or time it")
 		return
 	}
+	s.startRun(w, r, in.Kind, m.Name)
+}
+
+// startRun registers one task and runs it in the background: 202 with the task, or 409 while a
+// scheduled job or another task is running.
+func (s *Server) startRun(w http.ResponseWriter, r *http.Request, kind, model string) {
+	ctx := r.Context()
 	if active, err := (&scheduler.Store{DB: s.App.DB}).ActiveRuns(ctx); err == nil && len(active) > 0 {
 		apiError(w, r, http.StatusConflict, "a scheduled job is running; try again when it has finished")
 		return
@@ -128,7 +163,7 @@ func (s *Server) startTask(w http.ResponseWriter, r *http.Request) {
 	}
 	s.tasks.n++
 	tctx, cancel := context.WithCancel(context.Background())
-	t := &uiTask{ID: fmt.Sprintf("t%d", s.tasks.n), Kind: in.Kind, Model: m.Name, State: "running", Started: time.Now(), Lines: []string{}, cancel: cancel}
+	t := &uiTask{ID: fmt.Sprintf("t%d", s.tasks.n), Kind: kind, Model: model, State: "running", Started: time.Now(), Lines: []string{}, cancel: cancel}
 	s.tasks.recent = append([]*uiTask{t}, s.tasks.recent...)
 	if len(s.tasks.recent) > keepTasks {
 		s.tasks.recent = s.tasks.recent[:keepTasks]
@@ -173,6 +208,21 @@ func (s *Server) runTask(ctx context.Context, t *uiTask) {
 
 func (s *Server) doTask(ctx context.Context, t *uiTask, say func(string)) (string, error) {
 	a := s.App
+	if t.Kind == taskPull {
+		say("downloading " + t.Model)
+		if err := a.Pull(ctx, t.Model, say); err != nil {
+			return "", err
+		}
+		return t.Model + " is installed", nil
+	}
+	if m, err := a.FindModel(ctx, t.Model); err == nil && !m.Has(backends.CapChat) {
+		say("benchmark for a " + strings.Join(capNames(m), ", ") + " model")
+		out, err := a.BenchOther(ctx, t.Model, say)
+		if err != nil {
+			return "", err
+		}
+		return out.Summary, nil
+	}
 	switch t.Kind {
 	case taskBench, taskSpeed:
 		p, err := a.Bench(ctx, t.Model, func(l string) { say(l + "…") })
@@ -208,6 +258,14 @@ func (s *Server) doTask(ctx context.Context, t *uiTask, say func(string)) (strin
 		return fmt.Sprintf("%d of %d checked files tasks passed", out.Run.Passed, out.Run.Tasks), nil
 	}
 	return "", fmt.Errorf("unknown kind %q", t.Kind)
+}
+
+func capNames(m app.Model) []string {
+	var out []string
+	for _, c := range m.Capabilities {
+		out = append(out, string(c))
+	}
+	return out
 }
 
 func scoreLine(scores map[string]float64) string {

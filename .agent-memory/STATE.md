@@ -40,3 +40,6 @@ _Last updated: 2026-10-24 by Claude Code_
   and `anime-follow` jobs use it (a model-driven follow run took 13 min and wandered; this takes ~10 s).
 - Gotcha: a rebuilt `~/.noskill/bin/noskill` is a new binary to Little Snitch and to Full Disk
   Access: its Nyaa calls fail with "connect: bad file descriptor" until the user allows it again.
+- Status page can bench decision (JEV) and embedding models (`App.BenchOther`, `internal/app/benchother.go`)
+  and pull staple models that aren't installed (`internal/app/staples.go`, task kind `pull`). Baseline
+  embedding results: `docs/EMBEDDING_BENCH.md`. The live daemon needs a rebuild to get these.

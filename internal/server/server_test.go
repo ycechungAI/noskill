@@ -866,6 +866,16 @@ func TestModelActionsFromTheStatusPage(t *testing.T) {
 		t.Errorf("unknown model: %d %s", resp.StatusCode, body)
 	}
 
+	// Models noskill is built around that aren't installed are offered for pulling, and pulling takes
+	// any well-formed name: the user decides what fits on the disk.
+	_, body := g.do("GET", "/noskill/v1/status", nil, tray)
+	if !strings.Contains(string(body), `"missing":[`) || !strings.Contains(string(body), `"name":"tev1:0.8b"`) {
+		t.Errorf("the status doesn't offer the missing staples: %s", body)
+	}
+	if resp, body := g.do("POST", "/noskill/v1/tasks", map[string]string{"kind": "pull", "model": "bad name; rm -rf"}, tray); resp.StatusCode != 400 {
+		t.Errorf("a malformed name to pull: %d %s", resp.StatusCode, body)
+	}
+
 	// A model in orchestrator.exclude is never loaded or timed from the page either.
 	g.app.Cfg.Orchestrator.Exclude = []string{"qwen3:4b"}
 	if resp, body := g.do("POST", "/noskill/v1/tasks", map[string]string{"kind": "bench", "model": "qwen3:4b"}, tray); resp.StatusCode != 409 || !strings.Contains(string(body), "orchestrator.exclude") {
