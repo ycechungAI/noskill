@@ -37,7 +37,6 @@ Install Ollama if it is missing and download the recommended models. It looks fo
 
 - **8 GB or more:** `granite4:3b` (about 2 GB, the main model: tools, about 9 seconds a task) and `gemma3:1b` (about 0.8 GB, the backup for plain tasks).
 - **Under 8 GB:** `gemma3:1b` only.
-- **12 GB or more:** it also asks about `qwen3.5:4b` (about 4 GB, slower and stronger), default no.
 
 Models already installed are skipped and they are fetched one at a time. `./start.sh ollama -y` agrees without asking.
 

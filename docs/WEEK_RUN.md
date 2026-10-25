@@ -88,7 +88,7 @@ Two edits in `~/.noskill/config.toml` (backup: `config.toml.before-main-model`),
 
 ## Models changed again (2026-10-18, 12:40)
 - `llama3.2:latest` and `llama3.2:3b` are removed (they shared one file). It passed 3 of 10 checked `files` tasks.
-- `gemma3:1b` (806 MB, no tool support) is the backup model and takes summarise and extract requests (two rules in the config, before the tools rule). It scored 10 of 11 on those checked tasks, the same as `llama3.2`, at 0.6 s a task. A request that needs tools skips those rules, so tool runs, `anime-nightly` included, use `granite4:3b`, and then `qwen3.5:4b` if that can't load.
+- `gemma3:1b` (806 MB, no tool support) is the backup model and takes summarise and extract requests (two rules in the config, before the tools rule). It scored 10 of 11 on those checked tasks, the same as `llama3.2`, at 0.6 s a task. A request that needs tools skips those rules, so tool runs, `anime-nightly` included, use `granite4:3b`.
 - Backup before this edit: `~/.noskill/config.toml.before-gemma`.
 
 ## The new status page this week

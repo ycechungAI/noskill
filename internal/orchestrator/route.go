@@ -166,6 +166,8 @@ func (r Router) Route(c Classification, req Request, st State) (Decision, error)
 		}
 		cd.Score = cd.Quality - wl*cd.Latency
 		switch {
+		case slices.Contains(r.Cfg.Exclude, name):
+			cd.Rejected = "excluded in the config (orchestrator.exclude)"
 		case slices.Contains(r.Exclude, name):
 			cd.Rejected = "already tried for this request"
 		case !p.Info.Has(backends.CapChat):

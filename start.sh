@@ -208,9 +208,6 @@ setup_ollama() {
   else
     echo "the recommended models are already installed ($want)" >&2
   fi
-  if [ "$gb" -ge 12 ] && ! echo "$have" | grep -qx "qwen3.5:4b"; then
-    if ask_yes 0 "Also download qwen3.5:4b (about 4 GB), the slower, stronger model for hard tasks?"; then "$ob" pull qwen3.5:4b; fi
-  fi
   return 0
 }
 

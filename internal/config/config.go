@@ -79,8 +79,11 @@ type Orchestrator struct {
 	DefaultCtx      int       `toml:"default_ctx"`
 	// AutoTune lets calibration move decision thresholds from outcomes (FR-B6c). Off by
 	// default: `noskill calibration` only reports until it's turned on.
-	AutoTune bool   `toml:"auto_tune"`
-	Rules    []Rule `toml:"rules"`
+	AutoTune bool `toml:"auto_tune"`
+	// Exclude lists models the router never picks, by rule or by score, even when installed and
+	// the memory is free (FR-O2). `run --model` still names one on purpose.
+	Exclude []string `toml:"exclude"`
+	Rules   []Rule   `toml:"rules"`
 }
 
 // Rule is a user routing rule (FR-O2): rules always win unless a hard need rules the model out.

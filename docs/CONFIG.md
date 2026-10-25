@@ -54,6 +54,7 @@ decision_model = "tev1:0.8b"     # "" = emulate with chat model; "tev1" recommen
 decision_cache_gb = 1            # unload any of noskill's models whose prompt cache grows past this (ADR-0006, ADR-0012); 0 = never
 embed_model = "nomic-embed-text"
 min_swap_gain = 0.15
+exclude = []                     # models the router never picks, even when installed and memory is free, e.g. ["qwen3.5:4b"]; a rule naming one is skipped. `run --model` can still name it (FR-O2)
 hold_seconds = 120
 explore = 0.05
 default_ctx = 8192
@@ -65,10 +66,7 @@ use = "qwen2.5-coder:7b"
 # A rule's `when` takes task_type, needs and preset (fast | balanced | best), all of which must match; the first rule that matches and
 # whose model is installed and fits wins. `preset` is the one the run uses (`noskill run --preset best`, or orchestrator.preset):
 # [[orchestrator.rules]]
-# when = { needs = ["tools"], preset = "best" }   # quality model when asked for the best
-# use = "qwen3.5:4b"
-# [[orchestrator.rules]]
-# when = { needs = ["tools"] }                     # the fast model otherwise
+# when = { needs = ["tools"] }
 # use = "granite4:3b"
 
 [agent]

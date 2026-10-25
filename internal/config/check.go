@@ -90,6 +90,11 @@ func Check(l *Loaded, secrets SecretChecker) []Issue {
 	between("orchestrator.hold_seconds", float64(o.HoldSeconds), 0, 86400)
 	between("orchestrator.explore", o.Explore, 0, 1)
 	between("orchestrator.default_ctx", float64(o.DefaultCtx), 2048, 1<<20)
+	for i, m := range o.Exclude {
+		if strings.TrimSpace(m) == "" {
+			add("error", fmt.Sprintf("orchestrator.exclude[%d]", i), "a model name is empty")
+		}
+	}
 	for i, r := range o.Rules {
 		key := fmt.Sprintf("orchestrator.rules[%d]", i)
 		if r.Use == "" {

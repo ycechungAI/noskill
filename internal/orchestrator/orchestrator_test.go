@@ -277,6 +277,22 @@ func TestRuleSkippedWhenNotInstalled(t *testing.T) {
 	}
 }
 
+func TestExcludedModelIsNeverPicked(t *testing.T) {
+	c := cfg()
+	c.Exclude = []string{"qwen3:4b"}
+	// Uncertain type: no rule fires, and qwen3:4b would otherwise be the loaded, best-scoring model.
+	d, _ := Router{Cfg: c, Profiles: profiles()}.Route(Classification{TaskType: "chat", Confidence: 0.4, Uncertain: true}, Request{}, state16("qwen3:4b", time.Hour))
+	if d.Model == "qwen3:4b" || !strings.Contains(d.Explanation.Text(), "orchestrator.exclude") {
+		t.Fatalf("%s", d.Explanation.Text())
+	}
+	// A rule that names an excluded model is skipped with a note.
+	c.Rules = append([]config.Rule{{When: config.RuleWhen{TaskType: "creative"}, Use: "qwen3:4b"}}, c.Rules...)
+	d, _ = Router{Cfg: c, Profiles: profiles()}.Route(Classification{TaskType: "creative", Confidence: 0.9}, Request{}, state16("qwen2.5-coder:7b", time.Hour))
+	if d.Model == "qwen3:4b" || !strings.Contains(d.Explanation.Text(), "rule 1") {
+		t.Fatalf("%s", d.Explanation.Text())
+	}
+}
+
 func TestBanditEvidenceMovesRouting(t *testing.T) {
 	research := Classification{TaskType: "research", Confidence: 0.9}
 	st := state16("qwen2.5-coder:7b", time.Hour)

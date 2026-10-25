@@ -193,7 +193,6 @@ function SetupOllama([bool]$yes) {
   elseif (AskYes $yes "Download the recommended models: $($todo -join ' ') (granite4:3b about 2 GB = main, gemma3:1b about 0.8 GB = backup)?" $true) {
     foreach ($m in $todo) { [Console]::Error.WriteLine("-> ollama pull $m"); & $ob pull $m; if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("couldn't fetch ${m}: try  ollama pull $m  later") } }
   }
-  if ($gb -ge 12 -and $have -notcontains "qwen3.5:4b" -and (AskYes $false "Also download qwen3.5:4b (about 4 GB), the slower, stronger model for hard tasks?" $false)) { & $ob pull "qwen3.5:4b" }
   return $true
 }
 

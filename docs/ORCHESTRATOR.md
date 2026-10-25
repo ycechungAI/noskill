@@ -89,7 +89,8 @@ noskill doesn't change your Ollama server settings itself. `noskill doctor` chec
 ## Selection (FR-O2, FR-O3)
 
 ```
-candidates = models with required capabilities, context ≥ needed, and that fit the primary slot
+candidates = models with required capabilities, context ≥ needed, and that fit the primary slot,
+             minus any listed in `orchestrator.exclude` (never picked, by rule or by score)
 if a user rule matches → pick it (unless a hard need rules it out)
 score(m) = w_q·quality(m, task, difficulty)        # bench score blended with bandit posterior
          − w_l·expected_latency(m, input_len)       # includes load time if not loaded
@@ -198,12 +199,7 @@ use  = "qwen2.5-coder:7b"
 when = { needs = ["vision"] }
 use  = "qwen2.5vl:7b"
 
-# `preset` limits a rule to one preset, so one model is the fast default and another the quality choice
-# (measured on this project's machine, 2026-10-18: granite4:3b 9/10 checked files tasks at 9 s, 2.9 GB; qwen3.5:4b 10/10 at 14 s, 4.2 GB):
-[[orchestrator.rules]]
-when = { needs = ["tools"], preset = "best" }
-use  = "qwen3.5:4b"
-
+# (measured on this project's machine, 2026-10-18: granite4:3b 9/10 checked files tasks at 9 s, 2.9 GB):
 [[orchestrator.rules]]
 when = { needs = ["tools"] }
 use  = "granite4:3b"
