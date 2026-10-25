@@ -44,6 +44,7 @@ internal/app/           ✓ the engine: plan, run, undo, outcomes, memory hooks
 internal/cli/           ✓ every command (cmd/noskill is a thin main)
 internal/memory/        ✓ facts and preferences
 internal/volumes/       ✓ volume:<label> bindings to drive UUIDs
+internal/chores/        ✓ downloads-tidy, duplicate-finder, disk-watch, media-renamer and daily-brief logic: plans, scans, reports, the reminder parser (no model)
 internal/watch/         ✓ watcher skill logic: pages, feeds, releases, search items and what's new (no I/O)
 internal/docs/          ✓ local-docs index in docs.db: extract, chunk, FTS5 + vector search
 internal/anime/         ✓ anime-tracker: torrent-app detection, Transmission + qBittorrent, Nyaa, AniList, library scan, naming, filing
@@ -57,7 +58,7 @@ internal/server/        ✓ Host/Origin/token checks, OpenAI + Ollama proxy, /no
 internal/platform/      ✓ per-OS: paths, trash, memory, sandbox (macOS only), clone, volumes list and IDs, power, installed apps, app prefs, plain notifications
 internal/store/         ✓ sqlite + forward-only migrations
 scripts/docsite/        ✓ builds the docs site from the Markdown (static HTML; fails on broken links; `go run ./scripts/docsite`)
-skills/                 ✓ 10 built-in skills embedded (web-search, research, storm, files, orchestrator, model-manager, code-runner, anime-tracker, watcher, local-docs); skill-author is a spec for the learning loop
+skills/                 ✓ 15 built-in skills embedded (web-search, research, storm, files, orchestrator, model-manager, code-runner, anime-tracker, watcher, local-docs, downloads-tidy, duplicate-finder, disk-watch, media-renamer, daily-brief); skill-author is a spec for the learning loop
 ```
 
 ## Shared project memory

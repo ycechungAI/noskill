@@ -46,8 +46,11 @@ func (x Jobs) request(j scheduler.Job) (RunRequest, error) {
 }
 
 func (x Jobs) Start(ctx context.Context, j scheduler.Job) scheduler.Result {
-	if j.TargetKind == "anime" {
+	switch j.TargetKind {
+	case "anime":
 		return x.animeRun(ctx, j)
+	case "remind", "brief", "diskwatch":
+		return x.A.choreJob(ctx, j)
 	}
 	req, err := x.request(j)
 	if err != nil {
@@ -127,6 +130,14 @@ func (a *App) NotifyJob(ctx context.Context, j scheduler.Job, jr scheduler.JobRu
 	switch kind {
 	case scheduler.NotifyDone:
 		m.Title, m.Body = "noskill: "+j.Name+" finished", jr.Result
+		switch j.TargetKind {
+		case "remind":
+			m.Title = "Reminder"
+		case "brief":
+			m.Title = "noskill: your morning brief"
+		case "diskwatch":
+			m.Title, m.Urgent = "noskill: low disk space", true
+		}
 		if m.Body == "" {
 			m.Body = "Done."
 		}

@@ -23,6 +23,8 @@ type Result struct {
 	ApprovalID string // when waiting
 	Summary    string // the start of the answer
 	Err        error
+	// Quiet: nothing to report, so a finished run sends no notification (disk-watch on a good night).
+	Quiet bool
 }
 
 // Executor runs jobs: the engine in the daemon, a fake in tests.
@@ -423,7 +425,9 @@ func (s *Scheduler) finish(j Job, jr JobRun, res Result, rctx context.Context) {
 
 	switch jr.Status {
 	case StatusDone:
-		s.notify(ctx, j, jr, NotifyDone)
+		if !res.Quiet {
+			s.notify(ctx, j, jr, NotifyDone)
+		}
 	case StatusInterrupted:
 		// Retried when the daemon starts again (recover), without using up a retry.
 		s.Store.scheduleRetry(ctx, j.ID, now, jr.Attempt)

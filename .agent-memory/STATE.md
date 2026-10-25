@@ -43,3 +43,11 @@ _Last updated: 2026-10-24 by Claude Code_
 - Status page can bench decision (JEV) and embedding models (`App.BenchOther`, `internal/app/benchother.go`)
   and pull staple models that aren't installed (`internal/app/staples.go`, task kind `pull`). Baseline
   embedding results: `docs/EMBEDDING_BENCH.md`. The live daemon needs a rebuild to get these.
+
+## Update 2026-10-25 (housekeeping skills)
+
+- Added 5 built-in skills: downloads-tidy, duplicate-finder, disk-watch, media-renamer, daily-brief (`skills/`,
+  `internal/chores`, `internal/tools/builtin/chores.go`, `internal/app/chores.go`). New job kinds `remind`, `brief`,
+  `diskwatch`; CLI `noskill remind` and `noskill brief`. Live-checked with granite4:3b in a scratch home.
+- Not done: the live daemon still runs the older build; none of the five is scheduled yet (no `brief`/`diskwatch` jobs
+  added to the user's config); disk-watch `volumes` setting untested on Windows/Linux (uses platform.ListVolumes).

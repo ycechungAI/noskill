@@ -164,3 +164,21 @@ channel = "stable"               # stable | beta
 
 ## Per-skill settings
 Each skill documents its keys in its `SKILL.md` implementation spec. `noskill skills setup <name>` writes them interactively. Skill settings can reference other settings (`${config.download_dir}`) and secrets (`secret:NAME`).
+
+## Housekeeping skills
+
+```toml
+[skills.disk-watch]
+min_free_gb = 20          # warn when a drive has less than this free
+min_free_percent = 5      # or less than this share of its size
+volumes = []              # labels to watch; empty = every drive over 2 GB
+
+[skills.downloads-tidy]
+folder = "Sorted"         # where sorted files go, inside the folder
+
+[skills.duplicate-finder]
+allow = ["read:volume:RED", "write:volume:RED"]   # drives it may scan and trash copies on
+```
+
+`media-renamer` takes its folders the same way (`allow`). The `diskwatch` and `brief` jobs and the reminders are
+scheduled jobs that run in Go with no model; see `noskill schedule add` in [CLI.md](CLI.md).

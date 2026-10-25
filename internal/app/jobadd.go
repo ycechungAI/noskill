@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ type JobSpec struct {
 	Retries *int     `json:"retries,omitempty"` // nil = the [scheduler] default
 	Notify  []string `json:"notify,omitempty"`
 	Paused  bool     `json:"paused,omitempty"`
+	Once    bool     `json:"once,omitempty"` // switch the job off after its first run (a one-off reminder)
 }
 
 // AddJob checks a spec and stores the job. Every problem with the input is a *UserError.
@@ -114,6 +116,29 @@ func (a *App) AddJob(ctx context.Context, in JobSpec) (scheduler.Job, error) {
 		if in.Prompt != "" || in.Model != "" {
 			return bad("an anime job runs the tracker directly, with no model, so it takes no task or model")
 		}
+	} else if kind, rest, ok := modelFreeTarget(target); ok {
+		if in.Prompt != "" || in.Model != "" {
+			return bad("a %s job runs in Go with no model, so it takes no task or model", kind)
+		}
+		switch kind {
+		case "remind":
+			if rest == "" {
+				return bad("remind: needs the text to show")
+			}
+			j.Args.Once = in.Once
+			j.Retries = 0
+		case "brief":
+			if rest == "" {
+				rest = "24"
+			}
+			if n, err := strconv.Atoi(rest); err != nil || n < 1 || n > 168 {
+				return bad("brief: the hours to cover, 1 to 168 (brief:24)")
+			}
+		}
+		j.TargetKind, j.Target = kind, rest
+		if len(j.Notify) == 0 && len(in.Notify) == 0 {
+			j.Notify = []string{"os"} // these exist to tell you something
+		}
 	} else if s, ok := a.Skills.Get(target); ok {
 		j.TargetKind, j.Target = "skill", s.Name
 		if s.NeedsApproval() {
@@ -153,22 +178,43 @@ func JobName(j scheduler.Job) string {
 		return j.Target
 	case "anime":
 		return "anime-" + strings.ReplaceAll(j.Target, ",", "-")
+	case "brief", "diskwatch":
+		return j.TargetKind
+	case "remind":
+		return "remind-" + firstWords(j.Target, 3)
 	}
+	if n := firstWords(j.Target, 4); n != "" {
+		return n
+	}
+	return "job"
+}
+
+func firstWords(s string, n int) string {
 	var words []string
-	for _, w := range strings.Fields(strings.ToLower(j.Target)) {
+	for _, w := range strings.Fields(strings.ToLower(s)) {
 		w = strings.Trim(w, `.,!?:;"'()`)
 		if w != "" {
 			words = append(words, w)
 		}
-		if len(words) == 4 {
+		if len(words) == n {
 			break
 		}
 	}
-	n := strings.Join(words, "-")
-	if n == "" {
-		n = "job"
+	return strings.Join(words, "-")
+}
+
+// modelFreeTarget reads the job targets that run in Go with no model: remind:<text>, brief[:hours]
+// and diskwatch. (anime:<stages> is read separately.)
+func modelFreeTarget(t string) (kind, rest string, ok bool) {
+	for _, k := range []string{"remind", "brief", "diskwatch"} {
+		if t == k {
+			return k, "", true
+		}
+		if r, found := strings.CutPrefix(t, k+":"); found {
+			return k, strings.TrimSpace(r), true
+		}
 	}
-	return n
+	return "", "", false
 }
 
 // animeStages checks a stage list for an anime job: "all", or stages from the tracker's own list.

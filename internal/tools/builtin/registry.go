@@ -13,5 +13,6 @@ func Registry() tools.Registry {
 	r.Add(Anime()...)
 	r.Add(Watcher()...)
 	r.Add(Docs()...)
+	r.Add(Chores()...)
 	return r
 }

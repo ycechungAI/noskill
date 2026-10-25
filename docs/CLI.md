@@ -78,7 +78,9 @@ Built in block 5c (FR-S10, [ADR-0016](adr/0016-signed-skill-registry.md)). A reg
 
 | Command | Does |
 |---|---|
-| `noskill schedule add <skill|"prompt"> --cron "<expr>" | --every <dur>` | Flags: `--when volume:<label>`, `--when ac-power`, `--when unmetered`, `--when window:22:00-06:00` (repeatable; all must hold), `--missed skip|once`, `--timeout`, `--notify os,ntfy`. Target `anime:<stages>` (`anime:all`, `anime:download,file`) runs the anime tracker's stages directly, with no model, so it needs no Ollama and takes seconds; it takes no `--prompt` or `--model` |
+| `noskill remind "<what and when>"` · `remind list` · `remind rm <name>` | A reminder from a sentence: `noskill remind "call Sam tomorrow at 5pm"`, `"every Monday at 9 submit the report"`, `"in 20 minutes check the oven"`. It says what it understood and refuses when it can't tell when (daily-brief skill, FR-J1). A one-off switches itself off after it fires |
+| `noskill brief [--hours N]` | What happened since yesterday: jobs that ran or failed, episodes filed, approvals waiting, low disk space, what runs next. Built in code, no model |
+| `noskill schedule add <skill|"prompt"> --cron "<expr>" | --every <dur>` | Flags: `--when volume:<label>`, `--when ac-power`, `--when unmetered`, `--when window:22:00-06:00` (repeatable; all must hold), `--missed skip|once`, `--timeout`, `--notify os,ntfy`. Target `anime:<stages>` (`anime:all`, `anime:download,file`) runs the anime tracker's stages directly, with no model, so it needs no Ollama and takes seconds; it takes no `--prompt` or `--model`. Also model-free: `remind:<text>` (with `--cron`/`--every`), `brief[:hours]` and `diskwatch`; they notify on `os` unless you say otherwise |
 | `noskill schedule list` / `pause|resume|rm|run <job>` | |
 | `noskill jobs` / `jobs stop <id|--all>` | Running jobs and kill switch |
 | `noskill approvals` | Pending items: id, source (job/skill/learning), what, expires |

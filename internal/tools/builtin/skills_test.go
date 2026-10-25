@@ -85,8 +85,8 @@ func TestAllSkillDraftsParse(t *testing.T) {
 			}
 		}
 	}
-	if n != 11 {
-		t.Errorf("found %d skill folders, want 11", n)
+	if n != 16 {
+		t.Errorf("found %d skill folders, want 16", n)
 	}
 }
 

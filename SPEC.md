@@ -143,6 +143,11 @@ Specs live in [skills/](skills/).
 | [code-runner](skills/code-runner/SKILL.md) | P1 | Sandboxed Python for exact math, CSV/Excel/JSON work and conversions |
 | [watcher](skills/watcher/SKILL.md) | P1 | Scheduled watching of pages, RSS, GitHub releases and searches, with relevance filtering, alerts and digests |
 | [local-docs](skills/local-docs/SKILL.md) | P1 | Answers from the user's chosen folders with file/page citations; local hybrid index |
+| [downloads-tidy](skills/downloads-tidy/SKILL.md) | P1 | Sorts the loose files in Downloads into Documents, Images, Installers and so on; old installers go to the trash; one approval, undoable. The plan is made in Go |
+| [duplicate-finder](skills/duplicate-finder/SKILL.md) | P1 | Finds files with identical content across folders and drives, suggests which copy to keep, trashes the extras after approval (the trash tool re-checks the content) |
+| [disk-watch](skills/disk-watch/SKILL.md) | P1 | Free space per drive, what takes the space, large files nobody opened for a year; a model-free nightly job alerts only when a drive runs low |
+| [media-renamer](skills/media-renamer/SKILL.md) | P1 | One naming pattern for the episodes in a folder, read with the anime tracker's own parser; one approval, undoable |
+| [daily-brief](skills/daily-brief/SKILL.md) | P1 | A morning digest of noskill's own state (jobs, episodes filed, approvals, disk, what runs next) and plain-sentence reminders ("every Monday at 9 submit the report"); both are model-free scheduled jobs |
 
 ## 5. Non-functional requirements
 

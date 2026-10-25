@@ -13,6 +13,11 @@
 | [watcher](watcher/SKILL.md) | P1 · v0.3 | Scheduled watching of pages, feeds, releases, searches → alerts and digests |
 | [local-docs](local-docs/SKILL.md) | P1 · v0.3 | Answer from folders you add with `noskill docs add`, citing the file and section (PDFs not read yet) |
 | [anime-tracker](anime-tracker/SKILL.md) | P1 · v0.3 | This season's new anime → your approval + folder per title → English-subbed episodes from Nyaa through Transmission or qBittorrent (480p preferred) → copy, rename and file into your folder, download to trash |
+| [downloads-tidy](downloads-tidy/SKILL.md) | P1 · v0.4 | Sort Downloads into folders by type; old installers to the trash (`tidy_plan`, then `tidy_apply` after one approval) |
+| [duplicate-finder](duplicate-finder/SKILL.md) | P1 · v0.4 | Same-content files across folders and drives; `dupes_trash` re-checks the content before each trash |
+| [disk-watch](disk-watch/SKILL.md) | P1 · v0.4 | Free space, biggest folders, large idle files; the `diskwatch` job alerts only when a drive is low |
+| [media-renamer](media-renamer/SKILL.md) | P1 · v0.4 | One naming pattern for a folder's episodes, read with the anime tracker's parser (`rename_plan`, `rename_apply`) |
+| [daily-brief](daily-brief/SKILL.md) | P1 · v0.4 | Morning digest of noskill's own state and plain-sentence reminders; the `brief` and `remind` jobs run in Go with no model |
 
 Each `SKILL.md` has two parts:
 - **front-matter + body**: what the model sees. Kept short and imperative for small models.

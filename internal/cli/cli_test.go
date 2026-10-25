@@ -1219,3 +1219,26 @@ func TestUIStartsPageAndReusesRunningServer(t *testing.T) {
 		t.Errorf("exit %d\n%s", code, errb.String())
 	}
 }
+
+// noskill remind and noskill brief need no model: they schedule and read, in Go.
+func TestRemindAndBriefNeedNoModel(t *testing.T) {
+	h := newHarness(t)
+	out, _ := h.ok("", false, "remind", "remind me to submit the report every Monday at nine")
+	if !strings.Contains(out, `"Submit the report"`) || !strings.Contains(out, "every Monday at 09:00") {
+		t.Fatalf("remind:\n%s", out)
+	}
+	out, _ = h.ok("", false, "remind", "list")
+	if !strings.Contains(out, "remind-submit-the-report") || !strings.Contains(out, "Submit the report") {
+		t.Fatalf("list:\n%s", out)
+	}
+	if code, _, errs := h.run("", false, "remind", "call Sam"); code != ExitUsage || !strings.Contains(errs, "when") {
+		t.Errorf("a reminder with no time: code %d %q", code, errs)
+	}
+	h.ok("", false, "remind", "rm", "remind-submit-the-report")
+	if out, _ := h.ok("", false, "remind", "list"); !strings.Contains(out, "no reminders yet") {
+		t.Errorf("after rm:\n%s", out)
+	}
+	if out, _ := h.ok("", false, "brief"); strings.TrimSpace(out) == "" {
+		t.Error("an empty brief")
+	}
+}

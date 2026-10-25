@@ -18,7 +18,7 @@ import (
 type Job struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
-	TargetKind string `json:"target_kind"` // skill | prompt | anime (the tracker, no model; Target is its stages)
+	TargetKind string `json:"target_kind"` // skill | prompt | anime | remind | brief | diskwatch (the last four run in Go, no model)
 	Target     string `json:"target"`
 	Args       Args   `json:"args"`
 	Schedule   string `json:"schedule"` // cron:<expr> | every:<duration>
@@ -43,6 +43,8 @@ type Args struct {
 	Prompt string   `json:"prompt,omitempty"` // the task for a skill job ("" = the skill's own default)
 	Allow  []string `json:"allow,omitempty"`  // extra scopes for the job's skills (like `run --allow`)
 	Model  string   `json:"model,omitempty"`  // pin a model; "" = route
+	// Once: the job switches itself off after it has run (a one-off reminder).
+	Once bool `json:"once,omitempty"`
 }
 
 // JobRun is one occurrence of a job.
