@@ -23,6 +23,7 @@ var reviewedDeletes = map[string]int{
 	"internal/cli/cmd_doctor.go":          1,
 	"internal/cli/cmd_eval.go":            1,
 	"internal/cli/cmd_update.go":          1,
+	"internal/deepresearch/engine.go":     1,
 	"internal/learning/library.go":        7,
 	"internal/learning/script.go":         1,
 	"internal/learning/tuned.go":          1,

@@ -32,6 +32,7 @@ Checked by `grep os.Remove|os.RemoveAll|os.Rename` on 2026-10-16. Each should be
 | `internal/cli/cmd_config.go:179, 198`, `internal/cli/cmd_eval.go:273` | Temp file then rename onto config / progress file | Config file is the user's: check it is atomic and keeps a backup |
 | `internal/cli/cmd_doctor.go:233`, `internal/service/service_windows.go:53` | Temp scratch | Temp only |
 | `internal/app/registry.go:77` (moved from `cmd_skills.go` in 5c) | `GitFetch`'s shallow clone of a skill or registry | A folder it made with `os.MkdirTemp`; the URL only names what is cloned, never where |
+| `internal/deepresearch/engine.go:147` | `state.json.tmp` → `state.json` | `cfg.Dir` only, the run's own report folder, never user-chosen |
 
 ## Things to look at first (from writing the code)
 
