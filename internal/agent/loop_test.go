@@ -376,6 +376,26 @@ func TestToolStepsThinkOnlyWhenTheModelAlwaysThinks(t *testing.T) {
 	}
 }
 
+func TestToolStepsUseGradedThinkingWhenAsked(t *testing.T) {
+	fake := &backendtest.Fake{Script: []backends.Response{
+		{ToolCalls: []backends.ToolCall{call("search", `{"q":"a"}`)}},
+		{Content: "done"},
+	}}
+	r := req()
+	r.ToolThinkLevel = "low"
+	run(t, fake, &fakeTools{out: func(string, json.RawMessage) (string, error) { return "ok", nil }}, r)
+	if len(fake.Requests) == 0 {
+		t.Fatal("no requests sent")
+	}
+	first := fake.Requests[0]
+	if first.Think != nil {
+		t.Errorf("tool step: Think should be nil when ToolThinkLevel is set, got %v", *first.Think)
+	}
+	if first.ThinkLevel != "low" {
+		t.Errorf("tool step: ThinkLevel = %q, want low", first.ThinkLevel)
+	}
+}
+
 func TestStepCutOffWhileThinkingIsAskedAgain(t *testing.T) {
 	fake := &backendtest.Fake{Script: []backends.Response{
 		{Thinking: "Okay, the user wants… (cut off)"},

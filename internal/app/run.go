@@ -153,6 +153,18 @@ func fingerprint(s string) string {
 	return hex.EncodeToString(h[:8])
 }
 
+// toolThinkLevel: granite4.2's template renders badly with thinking fully off (think=false) —
+// tool calls are skipped and a stray "</think>" leaks into the answer (checked live, 2026-10-26).
+// "low" thinking fixes both the missed calls and the latency (2-3s, faster than think=false's
+// rambling 15s+). granite4:3b isn't affected (it scored 84/96 with think=false), so this is
+// scoped to the 4.2 line by name rather than applied to every "granite" family model.
+func toolThinkLevel(model string) string {
+	if strings.HasPrefix(model, "granite4.2") {
+		return "low"
+	}
+	return ""
+}
+
 // plan is everything decided before the model starts.
 type plan struct {
 	models    []Model
@@ -614,6 +626,7 @@ func (a *App) Run(ctx context.Context, req RunRequest) (*RunResult, error) {
 		// Reasoning counts against num_predict: 1024 cut qwen3:4b off before its tool call.
 		b.StepOutputTokens *= 2
 	}
+	toolThinkLevel := toolThinkLevel(p.pick.Name)
 	think := req.Think
 	if think == nil {
 		off := false
@@ -642,7 +655,7 @@ func (a *App) Run(ctx context.Context, req RunRequest) (*RunResult, error) {
 	}
 	res, runErr := loop.Run(ctx, agent.Request{
 		RunID: runID, Model: p.pick.Name, Messages: msgs, Strategy: strategy, CanConstrain: p.pick.Has(backends.CapSchema),
-		Think: think, AlwaysThinks: alwaysThinks, SmallModel: small, Budget: b, Final: final, Pending: pending, StartStep: startStep,
+		Think: think, AlwaysThinks: alwaysThinks, ToolThinkLevel: toolThinkLevel, SmallModel: small, Budget: b, Final: final, Pending: pending, StartStep: startStep,
 		Handoff: handoff,
 	})
 	driver := p.pick.Name

@@ -1618,3 +1618,17 @@ func TestSimilarTools(t *testing.T) {
 		}
 	}
 }
+
+func TestToolThinkLevel(t *testing.T) {
+	for _, c := range []struct{ model, want string }{
+		{"granite4.2:3b", "low"},
+		{"granite4.2:8b", "low"},
+		{"granite4:3b", ""},
+		{"gemma3:1b", ""},
+		{"qwen3:4b", ""},
+	} {
+		if got := toolThinkLevel(c.model); got != c.want {
+			t.Errorf("toolThinkLevel(%q) = %q, want %q", c.model, got, c.want)
+		}
+	}
+}

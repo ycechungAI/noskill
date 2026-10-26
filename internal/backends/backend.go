@@ -134,8 +134,12 @@ type ChatRequest struct {
 	Format   json.RawMessage // JSON Schema that constrains the output (constrained strategy, emulated decide)
 	// Think: nil = model default; false sends reasoning_effort "none" / think:false. Internal steps
 	// send false unless the client asked for thinking (PROXY.md "Thinking fields").
-	Think     *bool
-	Options   Options
+	Think *bool
+	// ThinkLevel: "low" | "medium" | "high", for models whose template reads a graded effort
+	// instead of a bool (e.g. granite4.2, PROXY.md "Thinking fields"). Wins over Think when set;
+	// ignored by backends/models that don't support it.
+	ThinkLevel string
+	Options    Options
 	KeepAlive *time.Duration
 }
 

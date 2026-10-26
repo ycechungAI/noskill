@@ -64,6 +64,10 @@ type Request struct {
 	// AlwaysThinks: the model can't stop thinking (backends.CapThinkAlways). Every step then sends
 	// think=true, so the reasoning arrives as thinking and the tool call or answer as content.
 	AlwaysThinks bool
+	// ToolThinkLevel: a graded effort ("low") sent on tool steps instead of think=false, for a
+	// model whose tool-calling is unreliable with thinking fully off (MODEL_ADAPTERS.md). Empty
+	// keeps the think=false default.
+	ToolThinkLevel string
 	// SmallModel: one tool call per step (MODEL_ADAPTERS.md "Other small-model tactics").
 	SmallModel bool
 	Budget     Budget
@@ -86,6 +90,7 @@ type Driver struct {
 	Strategy         backends.ToolStrategy
 	CanConstrain     bool
 	AlwaysThinks     bool
+	ToolThinkLevel   string
 	SmallModel       bool
 	ContextTokens    int
 	StepOutputTokens int
@@ -199,7 +204,7 @@ func (l *Loop) Run(ctx context.Context, req Request) (Result, error) {
 		if req.Handoff != nil && step > req.StartStep+1 {
 			if d := req.Handoff(ctx); d != nil {
 				l.Backend, req.Model, req.Strategy, req.CanConstrain = d.Backend, d.Model, d.Strategy, d.CanConstrain
-				req.AlwaysThinks, req.SmallModel, res.Model = d.AlwaysThinks, d.SmallModel, d.Model
+				req.AlwaysThinks, req.ToolThinkLevel, req.SmallModel, res.Model = d.AlwaysThinks, d.ToolThinkLevel, d.SmallModel, d.Model
 				if d.ContextTokens > 0 {
 					b.ContextTokens = d.ContextTokens
 				}
@@ -334,6 +339,9 @@ func (l *Loop) step(ctx context.Context, req Request, b Budget, step int, msgs [
 	cr := backends.ChatRequest{Model: req.Model, Messages: msgs, Options: backends.Options{NumCtx: b.ContextTokens, NumPredict: b.StepOutputTokens}}
 	think := false
 	cr.Think = &think
+	if !final && req.ToolThinkLevel != "" {
+		cr.Think, cr.ThinkLevel = nil, req.ToolThinkLevel
+	}
 	if final {
 		cr.Think = req.Think
 		if req.Final != nil {

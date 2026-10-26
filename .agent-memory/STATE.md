@@ -57,3 +57,22 @@ _Last updated: 2026-10-24 by Claude Code_
 - `./web.sh`: serves the docs site (8767) and the Phase 0 spike status (8765) in one run; the noskill status page has a
   Spikes tab that frames both (CSP `frame-src` allows only those two local ports). Windows: web.ps1 (written, not run on Windows). Both are the `web` item in start.sh / start.ps1.
 - internal/deepresearch (the deep-research pipeline) is written and tested but not yet wired to a skill/tool/CLI/status page.
+
+## Update 2026-10-26 (granite4.2:3b tool-calling fix)
+
+- The user installed `granite4.2:3b` (replacing `granite4:3b`, no longer on this machine) and its eval score
+  came in low: 76/96, against `granite4:3b`'s best recorded 84/96 (`eval history`). Root cause, checked live:
+  the agent loop forces `think=false` on every non-final step; granite4.2's template mishandles full-off
+  thinking, so it skipped tool calls (docs_search, tidy_apply, rename_apply) and once leaked a stray
+  `</think>` into a plain answer. `think="low"` fixed both, and was faster than the `false` run's rambling.
+  `granite4:3b` wasn't affected (it scored well at `think=false` already).
+- Fix: `backends.ChatRequest.ThinkLevel` (string, sent as Ollama's `think` field instead of the bool) +
+  `agent.Request.ToolThinkLevel`, applied on non-final steps only. `internal/app/run.go`'s `toolThinkLevel`
+  scopes it to model name prefix `granite4.2` (not the whole `granite` family or every thinking-capable
+  model) to avoid the latency problem `think=false` exists to prevent (docs/MODEL_ADAPTERS.md "Other
+  small-model tactics"). Two full-suite re-runs after the fix: 82/96 then 84/96 — matches `granite4:3b`'s
+  best. Code/math/summarise dips in the first re-run were confirmed as ordinary sampling noise (a
+  category-only re-run came back clean), not caused by the change.
+- Not done: no live check yet with the *old* `granite4:3b` tag re-pulled to confirm zero regression there
+  (it's simply not installed on this machine right now); the fix is scoped narrowly enough that this seems
+  low-risk, but worth a check if that model comes back into use.

@@ -395,7 +395,9 @@ func (b *Backend) chatBody(req backends.ChatRequest) map[string]any {
 	if len(req.Format) > 0 {
 		body["format"] = req.Format
 	}
-	if req.Think != nil {
+	if req.ThinkLevel != "" {
+		body["think"] = req.ThinkLevel
+	} else if req.Think != nil {
 		body["think"] = *req.Think
 	}
 	if req.KeepAlive != nil {

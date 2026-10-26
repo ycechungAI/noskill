@@ -39,6 +39,7 @@ Other small-model tactics:
 - Skill bodies trimmed to the "Steps" section in small-model mode.
 - Thinking (`think`) enabled only when the router marks difficulty ≥ 3 (latency).
 - **Thinking-only models** (capability `think-always`: the Ollama template always opens `<think>` and never reads `$.Think`, as in Qwen3 "Thinking-2507" builds): every step sends `think=true` and gets twice the step output (2048), because with `think=false` Ollama returns the reasoning as content and the step runs out before the tool call. A step that still runs out while thinking is asked once more to act. Reasoning that leaks into content before a bare `</think>` is moved out of the answer.
+- **Graded thinking for a hybrid model whose template mishandles full off** (`ChatRequest.ThinkLevel`, `"low"`/`"medium"`/`"high"`, sent as Ollama's `think` string instead of the bool): checked live on `granite4.2:3b` (2026-10-26) — with `think=false` it skipped tool calls outright (docs-search, tidy/rename apply) and once leaked a bare `</think>` into a plain-chat answer, while `think="low"` called tools correctly and was faster than the `false` run's rambling (2-3 s against 15 s+). `granite4:3b` wasn't affected (scored 84/96 at `think=false`), so this is scoped by model name (`toolThinkLevel`, `internal/app/run.go`) to the 4.2 line rather than applied to the whole `granite` family or every thinking-capable model — raising it generally risks the same latency problem `think=false` exists to avoid (PROXY.md "Thinking fields").
 
 ## JEV decision models
 
