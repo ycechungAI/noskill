@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"time"
 
 	"noskill/internal/platform"
 )
@@ -103,8 +104,21 @@ func (l *launchd) Stop(ctx context.Context) error {
 	if err != nil && (ExitCode(err) == 3 || ExitCode(err) == 113 || ExitCode(err) == 5) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	// bootout returns before launchd has let the agent go. Wait for that, so a Start right after
+	// bootstraps a fresh copy instead of kickstarting the one on its way out.
+	for deadline := time.Now().Add(unloadWait); time.Now().Before(deadline); time.Sleep(unloadPoll) {
+		if _, err := l.run.Run(ctx, "launchctl", "print", l.target()); err != nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("launchd hasn't unloaded %s after %s; try `noskill daemon start` in a moment", Label, unloadWait)
 }
+
+// How long Stop waits for launchd to unload the agent, and how often it looks.
+var unloadWait, unloadPoll = 10 * time.Second, 100 * time.Millisecond
 
 var (
 	rePID   = regexp.MustCompile(`(?m)^\s*pid = (\d+)`)

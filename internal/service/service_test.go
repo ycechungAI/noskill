@@ -253,6 +253,14 @@ func TestManagerLifecycle(t *testing.T) {
 		t.Error("no notes")
 	}
 	run.calls = nil
+	if runtime.GOOS == "darwin" { // after bootout, launchd no longer knows the agent
+		run.reply = func(name string, args []string) (string, error) {
+			if args[0] == "print" {
+				return "", exitErr(3)
+			}
+			return "", nil
+		}
+	}
 	if err := m.Stop(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -328,5 +336,36 @@ func TestDarwinStartAfterStop(t *testing.T) {
 	calls := strings.Join(run.joined(), "\n")
 	if !strings.Contains(calls, "launchctl bootstrap gui/") || strings.Contains(calls, "kickstart") {
 		t.Errorf("calls = %s", calls)
+	}
+}
+
+// bootout returns before launchd has let the agent go. Stop must wait until it's gone: a Start that
+// still saw it would kickstart the dying service, and the daemon would end up stopped.
+func TestDarwinStopWaitsForUnload(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("launchd only")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	run := &fakeRunner{}
+	m := NewManager(run, trashTo{t.TempDir()})
+	if err := m.Install(context.Background(), Spec{Exe: "/x/noskill", Args: []string{"serve"}}); err != nil {
+		t.Fatal(err)
+	}
+	prints := 0
+	run.reply = func(name string, args []string) (string, error) {
+		if args[0] == "print" {
+			if prints++; prints < 3 {
+				return "state = running", nil // still being torn down
+			}
+			return "", exitErr(3)
+		}
+		return "", nil
+	}
+	if err := m.Stop(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if prints != 3 {
+		t.Errorf("stop returned before launchd let the agent go (%d prints)", prints)
 	}
 }
