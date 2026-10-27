@@ -76,3 +76,13 @@ _Last updated: 2026-10-24 by Claude Code_
 - Not done: no live check yet with the *old* `granite4:3b` tag re-pulled to confirm zero regression there
   (it's simply not installed on this machine right now); the fix is scoped narrowly enough that this seems
   low-risk, but worth a check if that model comes back into use.
+
+## Update 2026-10-27 (new macOS user `ycechung`)
+
+- Set up from scratch for this user: `./start.sh install -y` (noskill in `~/.local/bin`, granite4:3b + gemma3:1b),
+  `noskill models probe`, `ollama pull tev1:0.8b nomic-embed-text`, `noskill daemon install` (launchd, runs
+  `~/.local/bin/noskill serve` on 11435, not a copy in `~/.noskill/bin`). `noskill doctor` all ok. No jobs scheduled.
+- README "After installing" section added with these steps.
+- Gotcha: the repo's files have empty owner permission bits (`d---r-x---`) and work only through ACLs, likely from
+  being copied from another account. Not changed; `chmod -R u+rwX` would fix it if "permission denied" shows up.
+- Seen once: the router sent "what is 17 * 23?" to gemma3:1b, which answered 1587 (a later run answered 391).
