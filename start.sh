@@ -242,7 +242,9 @@ install_noskill() {
   (cd "$here" && CGO_ENABLED=0 go build -o "$dir/noskill.new" ./cmd/noskill) || return 1
   mv "$dir/noskill.new" "$dir/noskill"   # one atomic swap
   echo "installed $dir/noskill" >&2
-  case ":$PATH:" in *":$dir:"*) ;; *) echo "add $dir to your PATH, for example:  echo 'export PATH=\"$dir:\$PATH\"' >> ~/.profile" >&2 ;; esac
+  # zsh (the macOS default) never reads ~/.profile, so name the file this shell does read.
+  case "${SHELL:-}" in */zsh) rc="~/.zshrc" ;; */bash) rc="~/.bashrc" ;; *) rc="~/.profile" ;; esac
+  case ":$PATH:" in *":$dir:"*) ;; *) echo "add $dir to your PATH, then open a new terminal:  echo 'export PATH=\"$dir:\$PATH\"' >> $rc" >&2 ;; esac
   setup_ollama "$yes" || echo "Ollama and the models can be set up later:  ./start.sh ollama" >&2
   if [ "$yes" = 1 ]; then a=y; else printf 'Run "noskill init" now (finds Ollama and your models, writes a starting config)? [Y/n] ' >&2; IFS= read -r a || a=n; fi
   case "$a" in n|N|no) echo "run it later with: noskill init" >&2 ;; *) "$dir/noskill" init ;; esac
