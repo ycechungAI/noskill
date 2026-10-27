@@ -301,3 +301,32 @@ func TestDarwinStatusWhenSwitchedOff(t *testing.T) {
 		t.Errorf("%+v %v", st, err)
 	}
 }
+
+// After `daemon stop` (bootout) the plist is still there but launchd has unloaded it: start must
+// bootstrap it again, not kickstart a service launchd no longer knows.
+func TestDarwinStartAfterStop(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("launchd only")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	run := &fakeRunner{}
+	m := NewManager(run, trashTo{t.TempDir()})
+	if err := m.Install(context.Background(), Spec{Exe: "/x/noskill", Args: []string{"serve"}}); err != nil {
+		t.Fatal(err)
+	}
+	run.calls = nil
+	run.reply = func(name string, args []string) (string, error) {
+		if args[0] == "print" {
+			return "", exitErr(3) // not loaded
+		}
+		return "", nil
+	}
+	if err := m.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	calls := strings.Join(run.joined(), "\n")
+	if !strings.Contains(calls, "launchctl bootstrap gui/") || strings.Contains(calls, "kickstart") {
+		t.Errorf("calls = %s", calls)
+	}
+}

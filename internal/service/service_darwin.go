@@ -82,7 +82,9 @@ func (l *launchd) Start(ctx context.Context) error {
 	if _, err := os.Stat(l.plist()); err != nil {
 		return ErrNotInstalled
 	}
-	if st, _ := l.Status(ctx); !st.Installed {
+	// Status counts the plist as installed even when launchd has unloaded it (after Stop's bootout,
+	// or switched off in Login Items), so ask launchd itself: kickstart only works on a loaded service.
+	if _, err := l.run.Run(ctx, "launchctl", "print", l.target()); err != nil {
 		if _, err := l.run.Run(ctx, "launchctl", "bootstrap", l.domain(), l.plist()); err != nil {
 			return fmt.Errorf("launchctl bootstrap failed: %w", err)
 		}

@@ -86,3 +86,8 @@ _Last updated: 2026-10-24 by Claude Code_
 - Gotcha: the repo's files have empty owner permission bits (`d---r-x---`) and work only through ACLs, likely from
   being copied from another account. Not changed; `chmod -R u+rwX` would fix it if "permission denied" shows up.
 - Seen once: the router sent "what is 17 * 23?" to gemma3:1b, which answered 1587 (a later run answered 391).
+- Fixed (uncommitted): `noskill daemon stop` then `start` failed on macOS ("Could not find service", exit 113):
+  Start decided bootstrap-vs-kickstart from Status().Installed, which is true whenever the plist exists. It now asks
+  `launchctl print` (TestDarwinStartAfterStop). start.sh's PATH hint now names ~/.zshrc / ~/.bashrc, not ~/.profile.
+- Gotcha: Edit/rewrite of a repo file drops its ACL and leaves it unreadable (owner bits empty); `chmod u+rw` it after.
+- /opt/homebrew (and its Go) belongs to the other account on this Mac (uid 501); this user can use but not manage it.
