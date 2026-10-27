@@ -134,10 +134,14 @@ func (a *App) AddJob(ctx context.Context, in JobSpec) (scheduler.Job, error) {
 			if n, err := strconv.Atoi(rest); err != nil || n < 1 || n > 168 {
 				return bad("brief: the hours to cover, 1 to 168 (brief:24)")
 			}
+		case "backup":
+			if rest != "" {
+				return bad("backup takes nothing after it: it backs up the job list to %s", a.JobBackupsDir())
+			}
 		}
 		j.TargetKind, j.Target = kind, rest
-		if len(j.Notify) == 0 && len(in.Notify) == 0 {
-			j.Notify = []string{"os"} // these exist to tell you something
+		if len(j.Notify) == 0 && len(in.Notify) == 0 && kind != "backup" {
+			j.Notify = []string{"os"} // these exist to tell you something (a backup doesn't)
 		}
 	} else if s, ok := a.Skills.Get(target); ok {
 		j.TargetKind, j.Target = "skill", s.Name
@@ -180,6 +184,8 @@ func JobName(j scheduler.Job) string {
 		return "anime-" + strings.ReplaceAll(j.Target, ",", "-")
 	case "brief", "diskwatch":
 		return j.TargetKind
+	case "backup":
+		return "jobs-backup"
 	case "remind":
 		return "remind-" + firstWords(j.Target, 3)
 	}
@@ -203,10 +209,10 @@ func firstWords(s string, n int) string {
 	return strings.Join(words, "-")
 }
 
-// modelFreeTarget reads the job targets that run in Go with no model: remind:<text>, brief[:hours]
-// and diskwatch. (anime:<stages> is read separately.)
+// modelFreeTarget reads the job targets that run in Go with no model: remind:<text>, brief[:hours],
+// diskwatch and backup (FR-J6). (anime:<stages> is read separately.)
 func modelFreeTarget(t string) (kind, rest string, ok bool) {
-	for _, k := range []string{"remind", "brief", "diskwatch"} {
+	for _, k := range []string{"remind", "brief", "diskwatch", "backup"} {
 		if t == k {
 			return k, "", true
 		}

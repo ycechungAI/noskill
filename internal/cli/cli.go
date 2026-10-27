@@ -92,7 +92,7 @@ func init() {
 		{"undo", "revert the file changes of a run", cmdUndo},
 		{"skills", "list, show, enable, disable, install, remove, diff and roll back skills", cmdSkills},
 		{"approvals", "list, approve or skip things waiting for you", cmdApprovals},
-		{"schedule", "add, list, pause, resume, remove or run scheduled jobs", cmdSchedule},
+		{"schedule", "add, list, pause, resume, remove or run scheduled jobs; back them up and restore them", cmdSchedule},
 		{"remind", "set a reminder from a sentence (\"call Sam tomorrow at 5pm\"); list, rm", cmdRemind},
 		{"brief", "what happened since yesterday: jobs, episodes filed, approvals, disk space", cmdBrief},
 		{"jobs", "show running jobs, stop them, or list past runs", cmdJobs},

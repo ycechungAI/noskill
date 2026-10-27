@@ -114,6 +114,7 @@ Detailed in [ORCHESTRATOR.md](docs/ORCHESTRATOR.md). The orchestrator is itself 
 | FR-J3 | P0 | Missed-run policy (skip / run once on wake), overlap policy, timeout, retries with backoff. |
 | FR-J4 | P0 | Job results are logged and optionally sent as notifications (OS notification, email, ntfy, Telegram, Discord webhook). |
 | FR-J5 | P1 | **Preconditions**: e.g. "run only if volume `RED` is mounted", "only on AC power", "only on unmetered network". |
+| FR-J6 | P1 | **Back up and restore jobs**: `noskill schedule backup` writes every job's settings (not its runs) to a JSON file in `<data>/backups/`; `schedule restore <name|file>` adds the jobs that aren't there and skips, with a reason, any whose name is taken or that this noskill can't run. A `backup` job kind does it on a schedule, writing nothing when the jobs haven't changed. The status page has both under "Add a job". |
 
 ### 3.7 Interfaces
 

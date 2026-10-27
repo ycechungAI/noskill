@@ -51,6 +51,8 @@ func (x Jobs) Start(ctx context.Context, j scheduler.Job) scheduler.Result {
 		return x.animeRun(ctx, j)
 	case "remind", "brief", "diskwatch":
 		return x.A.choreJob(ctx, j)
+	case "backup":
+		return x.A.backupJob(ctx)
 	}
 	req, err := x.request(j)
 	if err != nil {

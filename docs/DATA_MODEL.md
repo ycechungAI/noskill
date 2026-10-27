@@ -12,6 +12,7 @@ On macOS everything is under `~/.noskill/`. On Linux and Windows `config.toml` i
   skills/{builtin,user,learned}/      # files are the source of truth for skills
   traces/YYYY/MM/DD/<run-id>.jsonl    # full traces; state.db has the index
   runs/<run-id>/work/                 # sandbox workspaces (deleted after 7 days)
+  backups/jobs-<date>-<time>.json    # job backups (FR-J6): settings only, written by `schedule backup` or a backup job
   runtimes/  logs/  run/ (IPC socket)
 ```
 

@@ -87,7 +87,13 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
           <label for="job-only" class="mute">Only when</label><input id="job-only" type="text" spellcheck="false" placeholder="optional: volume:RED, ac-power, unmetered, window:01:00-06:00 (comma-separated)">
           <span></span><label class="row"><input type="checkbox" id="job-notify" checked> tell me the result (OS notification)</label>
           <span></span><span class="row"><button class="go" id="job-go" type="submit">Add job</button><span id="job-msg" role="status"></span></span>
-        </form></details></section>
+        </form></details>
+      <details id="jobbak" style="margin-top:6px"><summary style="cursor:pointer;color:var(--acc)">Back up and restore jobs</summary>
+        <p class="lead" style="margin-top:8px">A backup is a small file with every job's settings, kept in <code id="bak-folder">the backups folder</code>. Restoring adds the jobs you don't have and leaves the ones you do alone. To back up on a schedule, add a job whose What is <code>backup</code>.</p>
+        <div class="row" style="margin-bottom:8px"><button class="go" id="bak-go" type="button">Back up jobs now</button>
+          <input type="file" id="bak-file" accept=".json,application/json" hidden><button type="button" id="bak-pick">Restore from a file…</button>
+          <span id="bak-msg" role="status"></span></div>
+        <div class="scroll" id="bak-list"></div></details></section>
     <section id="s-skills"><h2>Skills</h2><div class="scroll" id="skills"></div></section>
     <section class="wide" id="s-brief"><h2>Brief</h2>
       <p class="lead" style="margin-top:0">What happened on this computer, built from noskill's own records (no model). <code>noskill schedule add brief --cron "0 7 * * *"</code> sends it as a notification every morning.</p>
@@ -284,6 +290,53 @@ $("jobf").onsubmit = async e => {
     refresh();
   } else { msg.className = "bad"; msg.textContent = (j.error && j.error.message) || "Couldn't add it (" + r.status + ")"; }
 };
+
+// ---- job backups (FR-J6: GET/POST /noskill/v1/jobs/backups, POST /noskill/v1/jobs/restore) ----
+function bakSay(cls, t) { const m = $("bak-msg"); m.className = cls; m.textContent = t; }
+function restored(j) {
+  const parts = [];
+  if (j.added && j.added.length) parts.push("Restored " + j.added.join(", "));
+  if (j.skipped && j.skipped.length) parts.push("skipped " + j.skipped.map(s => s.name + " (" + s.why + ")").join("; "));
+  const t = parts.join("; ");
+  return t ? t[0].toUpperCase() + t.slice(1) + "." : "The backup has no jobs.";
+}
+async function loadBackups() {
+  try {
+    const r = await api("/noskill/v1/jobs/backups");
+    if (!r.ok) return;
+    const j = await r.json();
+    $("bak-folder").textContent = j.folder;
+    put("bak-list", table(["Backup", "Jobs", "Made", ""], (j.backups || []).map(b => [
+      el("code", {}, b.name), b.jobs + "", ago(b.created_at),
+      el("button", {onclick: () => restore({file: b.name})}, "Restore")])) || empty("No backups yet."));
+  } catch (e) { /* the status call reports a lost server */ }
+}
+async function restore(body) {
+  bakSay("mute", "restoring…");
+  const r = await api("/noskill/v1/jobs/restore", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  let j = {}; try { j = await r.json(); } catch (x) {}
+  if (r.ok) { bakSay(j.added && j.added.length ? "ok" : "mute", restored(j)); refresh(); }
+  else bakSay("bad", (j.error && j.error.message) || "Couldn't restore it (" + r.status + ")");
+}
+$("bak-go").onclick = async () => {
+  $("bak-go").disabled = true; bakSay("mute", "backing up…");
+  const r = await api("/noskill/v1/jobs/backups", {method: "POST"});
+  let j = {}; try { j = await r.json(); } catch (x) {}
+  $("bak-go").disabled = false;
+  if (!r.ok) { bakSay("bad", (j.error && j.error.message) || "Couldn't back up (" + r.status + ")"); return; }
+  bakSay("ok", j.backup.unchanged ? "No changes since " + j.backup.name + "." : "Backed up " + j.backup.jobs + " jobs to " + j.backup.name + ".");
+  loadBackups();
+};
+$("bak-pick").onclick = () => $("bak-file").click();
+$("bak-file").onchange = async () => {
+  const f = $("bak-file").files[0];
+  $("bak-file").value = "";
+  if (!f) return;
+  let backup;
+  try { backup = JSON.parse(await f.text()); } catch (e) { bakSay("bad", f.name + " isn't a noskill jobs backup (it isn't JSON)."); return; }
+  restore({backup: backup});
+};
+$("jobbak").ontoggle = () => { if ($("jobbak").open) loadBackups(); };
 
 // ---- model actions: bench, speed only, tool check, checked tasks (tasks.go) ----
 let tasks = [], taskErr = "";

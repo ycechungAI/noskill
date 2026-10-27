@@ -131,6 +131,7 @@ Full schema, migrations and retention: [DATA_MODEL.md](DATA_MODEL.md). Settings:
   train/runs/<n>/                # RUN.json, adapters/, fused/, Modelfile, train.log
   traces/2026/10/15/<run-id>.jsonl
   runs/<run-id>/work/            # sandbox copy-in workspaces
+  backups/jobs-<date>-<time>.json   # job backups (FR-J6)
   runtimes/  uv/  node/  wasm-cache/
   logs/  run/ (IPC socket)
 ```

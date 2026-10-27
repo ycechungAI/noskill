@@ -91,3 +91,16 @@ _Last updated: 2026-10-24 by Claude Code_
   `launchctl print` (TestDarwinStartAfterStop). start.sh's PATH hint now names ~/.zshrc / ~/.bashrc, not ~/.profile.
 - Gotcha: Edit/rewrite of a repo file drops its ACL and leaves it unreadable (owner bits empty); `chmod u+rw` it after.
 - /opt/homebrew (and its Go) belongs to the other account on this Mac (uid 501); this user can use but not manage it.
+
+## Update 2026-10-27 (job backups, FR-J6)
+
+- New: `noskill schedule backup [--to f] | backups | restore <name|file>`, job kind `backup` (target `backup`, name
+  `jobs-backup`, no notify by default), endpoints `GET/POST /noskill/v1/jobs/backups` + `POST /noskill/v1/jobs/restore`,
+  and a "Back up and restore jobs" panel under "Add a job" (`internal/app/jobbackup.go`). Backups are settings only, in
+  `<data>/backups/jobs-<date>-<time>.json`; an unchanged job list writes nothing. Restore adds, never replaces (skips taken names).
+- Fixed: `daemon stop` returned before launchd unloaded the agent, so a `start` right after kickstarted the dying copy and the
+  daemon ended up stopped. Stop now waits (up to 10 s) for `launchctl print` to fail.
+- User's live setup: jobs and config restored from `/Users/Shared/neolinux/.noskill` (the old account's copy); 51 anime titles
+  repointed from `/Users/neolinux/Movies/Anime` to `/Users/ycechung/Movies/Anime` (snapshot `state.db.before-anime-folder`).
+  One backup made: `jobs-20261027-161002.json`. No scheduled `backup` job added yet.
+- User doesn't install Homebrew on this account; `go` here is still `/opt/homebrew/bin/go` from the other account (uid 501).

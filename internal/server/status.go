@@ -52,6 +52,60 @@ func (s *Server) addJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "job": j})
 }
 
+// listJobBackups lists the backups folder, newest first (FR-J6).
+func (s *Server) listJobBackups(w http.ResponseWriter, r *http.Request) {
+	list, err := s.App.ListJobBackups()
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if list == nil {
+		list = []app.JobBackupInfo{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"backups": list, "folder": s.App.JobBackupsDir()})
+}
+
+// backupJobs backs up the job list now, into the backups folder.
+func (s *Server) backupJobs(w http.ResponseWriter, r *http.Request) {
+	info, err := s.App.BackupJobs(r.Context(), "")
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "backup": info})
+}
+
+// restoreJobs restores {"file": a name in the backups folder} or {"backup": a backup file's contents}.
+func (s *Server) restoreJobs(w http.ResponseWriter, r *http.Request) {
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		File   string          `json:"file"`
+		Backup json.RawMessage `json:"backup"`
+	}
+	if err := json.Unmarshal(body, &in); err != nil || (in.File == "") == (len(in.Backup) == 0) {
+		s.fail(w, r, bad(`send {"file": a backup's name} or {"backup": the contents of a backup file}`))
+		return
+	}
+	var rep app.RestoreReport
+	var err error
+	if in.File != "" {
+		rep, err = s.App.RestoreJobBackup(r.Context(), in.File)
+	} else {
+		var b app.JobBackup
+		if b, err = app.ParseJobBackup(in.Backup); err == nil {
+			rep, err = s.App.RestoreJobs(r.Context(), b)
+		}
+	}
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "added": rep.Added, "skipped": rep.Skipped})
+}
+
 // jobAction: pause | resume | run for one job, or job "all" with pause | resume.
 func (s *Server) jobAction(w http.ResponseWriter, r *http.Request) {
 	ctx, id, action := r.Context(), r.PathValue("id"), r.PathValue("action")

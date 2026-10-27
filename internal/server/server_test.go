@@ -948,6 +948,54 @@ func TestAddJobFromTheStatusPage(t *testing.T) {
 	}
 }
 
+// Back up and restore jobs from the status page (FR-J6): admin only, by name or by uploaded contents.
+func TestJobBackupsFromTheStatusPage(t *testing.T) {
+	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {
+		c.Server.Tokens = []config.Token{{Name: "chat", Token: "secret:C"}, {Name: "tray", Token: "secret:T", Admin: true}}
+	}, map[string]string{"C": "chat-token-0123456789", "T": "tray-token-0123456789"})
+	chat := map[string]string{"Authorization": "Bearer chat-token-0123456789"}
+	tray := map[string]string{"Authorization": "Bearer tray-token-0123456789"}
+
+	for _, c := range []struct{ method, path string }{{"GET", "/noskill/v1/jobs/backups"}, {"POST", "/noskill/v1/jobs/backups"}, {"POST", "/noskill/v1/jobs/restore"}} {
+		if resp, _ := g.do(c.method, c.path, map[string]string{}, chat); resp.StatusCode != 403 {
+			t.Errorf("%s %s for a chat token: %d", c.method, c.path, resp.StatusCode)
+		}
+	}
+	if resp, body := g.do("GET", "/noskill/v1/jobs/backups", nil, tray); resp.StatusCode != 200 || !strings.Contains(string(body), `"backups":[]`) {
+		t.Fatalf("empty list: %d %s", resp.StatusCode, body)
+	}
+	g.do("POST", "/noskill/v1/jobs", map[string]any{"target": "brief", "cron": "0 7 * * *"}, tray)
+	resp, body := g.do("POST", "/noskill/v1/jobs/backups", nil, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"jobs":1`) {
+		t.Fatalf("backup: %d %s", resp.StatusCode, body)
+	}
+	var made struct{ Backup struct{ Name string } }
+	json.Unmarshal(body, &made)
+
+	// Restoring over the same jobs skips them; an uploaded backup adds what's new.
+	resp, body = g.do("POST", "/noskill/v1/jobs/restore", map[string]any{"file": made.Backup.Name}, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"added":[]`) || !strings.Contains(string(body), "already exists") {
+		t.Errorf("restore by name: %d %s", resp.StatusCode, body)
+	}
+	up := map[string]any{"backup": map[string]any{"noskill_jobs_backup": 1, "jobs": []map[string]any{
+		{"name": "disk", "target_kind": "diskwatch", "schedule": "cron:30 6 * * *", "enabled": true}}}}
+	resp, body = g.do("POST", "/noskill/v1/jobs/restore", up, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"added":["disk"]`) {
+		t.Errorf("restore upload: %d %s", resp.StatusCode, body)
+	}
+	for name, bad := range map[string]map[string]any{
+		"neither":     {},
+		"both":        {"file": "x.json", "backup": map[string]any{"noskill_jobs_backup": 1}},
+		"not ours":    {"backup": map[string]any{"jobs": []any{}}},
+		"traversal":   {"file": "../state.db"},
+		"no such one": {"file": "jobs-19990101-000000.json"},
+	} {
+		if resp, body := g.do("POST", "/noskill/v1/jobs/restore", bad, tray); resp.StatusCode != 400 {
+			t.Errorf("%s: %d %s", name, resp.StatusCode, body)
+		}
+	}
+}
+
 // The Brief section of the status page: the digest and the reminders (daily-brief skill).
 func TestBriefAndRemindersFromTheStatusPage(t *testing.T) {
 	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {

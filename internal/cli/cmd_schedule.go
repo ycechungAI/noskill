@@ -35,8 +35,17 @@ func cmdSchedule(c *cmd, args []string) int {
 			return c.usageErr("usage: noskill schedule history <job>")
 		}
 		return jobsHistory(c, ctx, args[1])
+	case "backup":
+		return scheduleBackup(c, ctx, args[1:])
+	case "backups":
+		return scheduleBackups(c, ctx)
+	case "restore":
+		if len(args) != 2 {
+			return c.usageErr("usage: noskill schedule restore <backup name | file>   (see `noskill schedule backups`)")
+		}
+		return scheduleRestore(c, ctx, args[1])
 	}
-	return c.usageErr("unknown schedule command %q (add, list, pause, resume, rm, run, history)", args[0])
+	return c.usageErr("unknown schedule command %q (add, list, pause, resume, rm, run, history, backup, backups, restore)", args[0])
 }
 
 func scheduleAdd(c *cmd, ctx context.Context, args []string) int {

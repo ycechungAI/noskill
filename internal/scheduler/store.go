@@ -18,7 +18,7 @@ import (
 type Job struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
-	TargetKind string `json:"target_kind"` // skill | prompt | anime | remind | brief | diskwatch (the last four run in Go, no model)
+	TargetKind string `json:"target_kind"` // skill | prompt | anime | remind | brief | diskwatch | backup (the last five run in Go, no model)
 	Target     string `json:"target"`
 	Args       Args   `json:"args"`
 	Schedule   string `json:"schedule"` // cron:<expr> | every:<duration>
