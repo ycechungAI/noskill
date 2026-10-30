@@ -174,8 +174,54 @@ func Main(args []string, env Env) int {
 		}
 	}
 	c.errf("noskill: unknown command %q\n", name)
+	if near := nearestCommand(name); near != "" {
+		c.errf("did you mean `noskill %s`? (`noskill help` lists the commands)\n", near)
+		return ExitUsage
+	}
 	c.usage(env.Stderr)
 	return ExitUsage
+}
+
+// nearestCommand is the command a mistyped name most likely meant ("dameon" → "daemon"), or "".
+// Distance counts a swap of two neighbouring letters as one edit; short names allow only one.
+func nearestCommand(name string) string {
+	best, bestD := "", 3
+	for _, cm := range commands {
+		limit := 2
+		if len(cm.name) <= 4 {
+			limit = 1
+		}
+		if d := editDistance(strings.ToLower(name), cm.name); d <= limit && d < bestD {
+			best, bestD = cm.name, d
+		}
+	}
+	return best
+}
+
+// editDistance is the optimal-string-alignment distance: insert, delete, replace, or swap neighbours.
+func editDistance(a, b string) int {
+	ra, rb := []rune(a), []rune(b)
+	d := make([][]int, len(ra)+1)
+	for i := range d {
+		d[i] = make([]int, len(rb)+1)
+		d[i][0] = i
+	}
+	for j := range d[0] {
+		d[0][j] = j
+	}
+	for i := 1; i <= len(ra); i++ {
+		for j := 1; j <= len(rb); j++ {
+			cost := 1
+			if ra[i-1] == rb[j-1] {
+				cost = 0
+			}
+			d[i][j] = min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+cost)
+			if i > 1 && j > 1 && ra[i-1] == rb[j-2] && ra[i-2] == rb[j-1] {
+				d[i][j] = min(d[i][j], d[i-2][j-2]+1)
+			}
+		}
+	}
+	return d[len(ra)][len(rb)]
 }
 
 func (c *cmd) usage(w io.Writer) {

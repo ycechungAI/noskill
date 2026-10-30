@@ -124,6 +124,9 @@ func TestUsageAndVersion(t *testing.T) {
 	if code, _, errs := h.run("", false, "frobnicate"); code != ExitUsage || !strings.Contains(errs, "unknown command") {
 		t.Errorf("unknown: %d %s", code, errs)
 	}
+	if code, _, errs := h.run("", false, "dameon", "start"); code != ExitUsage || !strings.Contains(errs, "did you mean `noskill daemon`?") {
+		t.Errorf("typo: %d %s", code, errs)
+	}
 	out, _ := h.ok("", false, "version")
 	if out != "noskill test\n" {
 		t.Errorf("version = %q", out)
@@ -1240,5 +1243,16 @@ func TestRemindAndBriefNeedNoModel(t *testing.T) {
 	}
 	if out, _ := h.ok("", false, "brief"); strings.TrimSpace(out) == "" {
 		t.Error("an empty brief")
+	}
+}
+
+func TestNearestCommand(t *testing.T) {
+	for name, want := range map[string]string{
+		"dameon": "daemon", "deamon": "daemon", "daemn": "daemon", "Daemon": "daemon",
+		"schedul": "schedule", "frobnicate": "", "xyz": "",
+	} {
+		if got := nearestCommand(name); got != want {
+			t.Errorf("nearestCommand(%q) = %q, want %q", name, got, want)
+		}
 	}
 }

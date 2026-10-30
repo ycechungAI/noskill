@@ -104,3 +104,11 @@ _Last updated: 2026-10-24 by Claude Code_
   repointed from `/Users/neolinux/Movies/Anime` to `/Users/ycechung/Movies/Anime` (snapshot `state.db.before-anime-folder`).
   One backup made: `jobs-20261027-161002.json`. No scheduled `backup` job added yet.
 - User doesn't install Homebrew on this account; `go` here is still `/opt/homebrew/bin/go` from the other account (uid 501).
+
+## Update 2026-10-30 (CLI typo suggestions)
+
+- An unknown top-level command now suggests the nearest one (`noskill dameon` → "did you mean `noskill daemon`?")
+  instead of printing the full command list (`nearestCommand`/`editDistance` in `internal/cli/cli.go`; adjacent swaps
+  count as one edit; names of 4 letters or fewer allow 1 edit, longer ones 2). Subcommands (`daemon strat`) don't suggest yet.
+- `noskill daemon start` checked live: stop→start cycles all work. It still prints "✓ started" without checking the
+  server answers (install does), and daemon.log's "serving"/"stopped" lines have no timestamps.
