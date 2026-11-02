@@ -112,3 +112,34 @@ _Last updated: 2026-10-24 by Claude Code_
   count as one edit; names of 4 letters or fewer allow 1 edit, longer ones 2). Subcommands (`daemon strat`) don't suggest yet.
 - `noskill daemon start` checked live: stop→start cycles all work. It still prints "✓ started" without checking the
   server answers (install does), and daemon.log's "serving"/"stopped" lines have no timestamps.
+
+## Update 2026-11-01
+
+- New: **the noskill app** (FR-I8, ADR-0017, docs/APP.md), a SwiftUI macOS prototype in `apps/macos/`.
+  It starts/stops/watches Ollama, `noskill serve`, orcastrator (`~/dev/orcastrator`, :8400) and sched
+  (`~/dev/scheduler`, daemon + :8787) and shows their pages in one window, plus a menu-bar icon.
+  Build `apps/macos/build-app.sh`, test `apps/macos/test.sh` (14 tests). Verified live: Start All on
+  launch brings all five up; quit stops what it started and leaves an external Ollama running.
+- Uncommitted as of this update (docs, SPEC FR-I8, AGENTS layout line, apps/macos).
+- Next: commit; then decide whether to merge sched tasks into noskill jobs and orcastrator's STORM
+  report into `internal/deepresearch` (ADR-0017 option 2).
+- Gotcha: starting `noskill serve` from the app runs the jobs' missed-run policy (jobs stopped on
+  2026-10-30 when the daemon wasn't running).
+
+## Update 2026-11-02 (noskill app: Setup, Ollama pane, DMG)
+
+- The app (apps/macos, v0.2.0) now has Setup (welcome on first run when app.json is missing; one-click,
+  ask-first fixes: install Ollama, pull models, install the bundled agent / `noskill init`, uv-Python
+  .venv for orcastrator (`./start.sh --setup`, branch feature/setup-flag there) and sched (`_venv.sh`),
+  repair owner permissions, choose folders), an Ollama pane (install, models, Find a model guide with
+  favourites/recent, sign in/out, chat), per-tab Start/Stop, and `make-dmg.sh` (build, package, mount,
+  verify, `--self-test`). 48 tests in ~0.01 s; build-app.sh tests first. `--snapshot DIR` draws the panes.
+- Stuck clicks: logs moved out of Supervisor (LogStore), one state publish per check, web views kept in
+  place and hidden instead of moved, sidebar can't be deselected. Not confirmed by clicking (no
+  accessibility/screen-recording permission here); ask the user.
+- sched: describe-a-task box in the New task panel (POST /api/tasks/draft), branch feature/describe-task.
+- Checked by hand: DMG installs to ~/Applications (this account can't write /Applications); a fresh start
+  with app.json moved aside shows the welcome and writes nothing. Not run live: the Ollama download, the
+  uv/venv build, repair, bundled-agent install (scripts are tested; repair tested on a scratch folder).
+- The user's app.json is at the session scratchpad as app.json.before-fresh-test; the app writes a new one
+  when Setup finishes.

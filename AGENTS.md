@@ -57,6 +57,7 @@ internal/schema/        ✓ tool-argument validation and repair
 internal/server/        ✓ Host/Origin/token checks, OpenAI + Ollama proxy, /noskill/v1 status page at /ui, admin calls for the tray
 internal/platform/      ✓ per-OS: paths, trash, memory, sandbox (macOS only), clone, volumes list and IDs, power, installed apps, app prefs, plain notifications
 internal/store/         ✓ sqlite + forward-only migrations
+apps/macos/             ✓ the noskill app (SwiftUI, macOS only): starts and shows noskill, orcastrator and sched (FR-I8, ADR-0017; prototype)
 scripts/docsite/        ✓ builds the docs site from the Markdown (static HTML; fails on broken links; `go run ./scripts/docsite`)
 skills/                 ✓ 15 built-in skills embedded (web-search, research, storm, files, orchestrator, model-manager, code-runner, anime-tracker, watcher, local-docs, downloads-tidy, duplicate-finder, disk-watch, media-renamer, daily-brief); skill-author is a spec for the learning loop
 ```

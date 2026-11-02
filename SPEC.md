@@ -127,6 +127,7 @@ Detailed in [ORCHESTRATOR.md](docs/ORCHESTRATOR.md). The orchestrator is itself 
 | FR-I5 | — | ~~MCP client~~ **Dropped 2026-10-15**: not planned. Tools come from built-in, script and WASM runtimes. |
 | FR-I6 | P1 | *(built in 2b at `/ui`; polls `/noskill/v1/status`)* Local web status page served by the daemon: jobs, approvals, traces, skills (with learned-skill review queue), model profiles. The tray app opens it for details. |
 | FR-I7 | P1 | *(built in 2b as `noskill-tray`; talks HTTP, not IPC: [ADR-0011](docs/adr/0011-tray-and-status-page-over-http.md); login-item install isn't built)* **Tray/menu-bar app** (macOS, Windows, Linux): daemon status, running/next jobs, approvals with approve/skip, pause all, open status page. Separate small binary talking to the daemon over IPC ([ADR-0004](docs/adr/0004-tray-app.md)). |
+| FR-I8 | P1 | *(prototype in `apps/macos/`, [ADR-0017](docs/adr/0017-noskill-app-runs-three-projects.md))* **The noskill app** (macOS): one app that starts, stops and watches Ollama, the noskill agent, orcastrator (research reports) and sched (scheduled tasks), with one window showing each one's page and a menu-bar icon. See [docs/APP.md](docs/APP.md). |
 
 ## 4. Built-in skills (initial set)
 

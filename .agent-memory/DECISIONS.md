@@ -23,3 +23,11 @@ progress, open threads, past decisions) was getting lost on every switch. Plain 
 committed to the repo is the one format every tool can read without any special support.
 **Alternatives considered:** A database or MCP-server-backed memory was ruled out for now — the
 whole point is zero-setup compatibility with tools that have no concept of this skill.
+
+## 2026-11-01 The noskill app runs the three projects as they are
+**Decision:** One native macOS app (`apps/macos/`) supervises noskill, orcastrator and sched by
+port and shows their own pages in web views, instead of porting the two Python projects into Go.
+**Why:** The user wanted one app with one UI working today; this needs no change to the three
+projects. Merging stays possible later without changing the app's window.
+**Alternatives considered:** Merging everything into noskill (much bigger); a browser dashboard
+(the user chose native).

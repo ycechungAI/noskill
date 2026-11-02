@@ -37,6 +37,9 @@ noskill is a planned runtime that gives **local models** (Ollama, LM Studio, lla
 
 > **Status: Phase 3 and in use on macOS.** The runtime, learning loop, skill optimisation, scheduler, anime-tracker, signed skill registry and an opt-in LoRA pipeline are built and tested on macOS against a real Ollama. Linux and Windows build and vet cleanly but haven't been run on real machines. No release, installer or website is published yet; the GitHub org, signing key and domain are decided last ([PACKAGING.md](docs/PACKAGING.md)). This repo also holds the spec, the design docs and the Phase 0 test harness (`spikes/`, Python).
 
+## The noskill app (macOS prototype)
+One app that starts and runs noskill together with two sibling projects, **orcastrator** (long research reports, `~/dev/orcastrator`) and **sched** (prompts on a cron schedule, `~/dev/scheduler`), plus Ollama. Start All brings them all up, and one window shows each one's page with a menu-bar icon for status. Build it with `apps/macos/build-app.sh`. What it runs and how: [docs/APP.md](docs/APP.md).
+
 ## What it does
 - **Add skills to any local model.** Skills are agentskills.io-compatible `SKILL.md` packages. They work on models with native tool calling and, through constrained output, on models without it.
 - **Learn skills.** When a multi-step task succeeds, noskill drafts a skill and tests it. It asks you before using it the first time, then uses it automatically after 3 successful runs. Skills that keep failing get refined or retired.
@@ -83,6 +86,7 @@ Read them as a site: `go run ./scripts/docsite` writes `site/` (static HTML, no 
 | [VISION.md](docs/VISION.md) | Problem, goals, non-goals |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components and tech choices |
 | [CLI.md](docs/CLI.md) | Command reference |
+| [APP.md](docs/APP.md) | The noskill app: one window for noskill, orcastrator and sched |
 | [SKILL_AUTHORING.md](docs/SKILL_AUTHORING.md) · [SKILL_FORMAT.md](docs/SKILL_FORMAT.md) · [LEARNING.md](docs/LEARNING.md) | How to write a skill; the format; how skills are learned, optimised and retired |
 | [ORCHESTRATOR.md](docs/ORCHESTRATOR.md) · [MODEL_ADAPTERS.md](docs/MODEL_ADAPTERS.md) | Model routing, memory budget, backends, decision models |
 | [PROXY.md](docs/PROXY.md) · [SECURITY.md](docs/SECURITY.md) | Chat-app proxy; permissions and sandboxing |
