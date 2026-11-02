@@ -26,6 +26,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp -X "$(swift build "${FLAGS[@]}" --show-bin-path)/NoskillApp" "$APP/Contents/MacOS/NoskillApp"
 strip -x "$APP/Contents/MacOS/NoskillApp"
 cp -X Support/Info.plist "$APP/Contents/Info.plist"
+cp -X Support/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"  # drawn by Support/make-icon.swift
 
 # The agent itself, built from this source tree (as ./start.sh install builds it).
 GO=$(command -v go || true)
