@@ -18,7 +18,9 @@ section.wide{grid-column:1/-1}
 h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 8px;font-weight:600}
 table{width:100%;border-collapse:collapse}
 th{text-align:left;color:var(--mute);font-weight:500;font-size:12px}
-td,th{padding:4px 8px 4px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td,th{padding:4px 10px 4px 0;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
+td div{white-space:normal;overflow-wrap:anywhere}
+td .row{flex-wrap:nowrap}
 tr:last-child td{border-bottom:0}
 .scroll{overflow-x:auto}
 .chip{display:inline-block;padding:0 7px;border-radius:99px;background:var(--chip);font-size:12px;white-space:nowrap}
@@ -73,7 +75,7 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
 </nav>
 <main>
   <div class="tabpanel" id="p-overview" role="tabpanel" aria-labelledby="tab-overview">
-    <section id="s-jobs"><h2>Jobs</h2><div class="scroll" id="jobs"></div>
+    <section class="wide" id="s-jobs"><h2>Jobs</h2><div class="scroll" id="jobs"></div>
       <details id="addjob" style="margin-top:10px"><summary style="cursor:pointer;color:var(--acc)">Add a job</summary>
         <p class="lead" style="margin-top:8px">Run a skill or a prompt on a schedule. The daemon picks it up within a few seconds. Permissions beyond the skill's own (<code>--allow</code>) are set with <code>noskill schedule add</code>.</p>
         <form class="addf" id="jobf" autocomplete="off">
@@ -95,6 +97,7 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
           <span id="bak-msg" role="status"></span></div>
         <div class="scroll" id="bak-list"></div></details></section>
     <section id="s-skills"><h2>Skills</h2><div class="scroll" id="skills"></div></section>
+    <section id="s-learning"><h2>Learning</h2><div class="scroll" id="learning"></div><h2 style="margin-top:14px">Evaluation</h2><div class="scroll" id="eval"></div></section>
     <section class="wide" id="s-brief"><h2>Brief</h2>
       <p class="lead" style="margin-top:0">What happened on this computer, built from noskill's own records (no model). <code>noskill schedule add brief --cron "0 7 * * *"</code> sends it as a notification every morning.</p>
       <div class="row" style="margin-bottom:8px"><label for="brief-hours" class="mute">Since</label>
@@ -108,7 +111,6 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
       <div class="scroll" id="reminders"></div></section>
     <section class="wide" id="s-models"><h2>Models</h2><div id="mtask"></div><div class="scroll" id="models"></div>
       <p class="lead" style="margin:8px 0 0">Bench times a model and runs the quick quality check (a few minutes at most); it unloads the model first. One action runs at a time, and none starts while a scheduled job is running.</p></section>
-    <section id="s-learning"><h2>Learning</h2><div class="scroll" id="learning"></div><h2 style="margin-top:14px">Evaluation</h2><div class="scroll" id="eval"></div></section>
   </div>
   <div class="tabpanel" id="p-approvals" role="tabpanel" aria-labelledby="tab-approvals">
     <section class="wide" id="s-approvals"><h2>Waiting for you</h2>
@@ -222,7 +224,7 @@ function render(d) {
   const s = d.status;
   for (const k of ["models", "backends", "jobs", "approvals", "runs", "skills", "learning", "eval"]) s[k] = s[k] || [];
   paused = s.jobs_paused;
-  $("sub").textContent = "v" + d.version + " · " + (s.primary ? s.primary + " loaded" : "no model loaded") + " · sandbox: " + (s.sandbox || "none");
+  $("sub").textContent = (d.version === "dev" ? "dev build" : "v" + d.version) + " · " + (s.primary ? s.primary + " loaded" : "no model loaded") + " · sandbox: " + (s.sandbox || "none");
   const pa = $("pauseall");
   pa.textContent = paused ? "Resume all jobs" : "Pause all jobs";
   pa.onclick = () => act("/noskill/v1/jobs/all/" + (paused ? "resume" : "pause"));
@@ -234,8 +236,8 @@ function render(d) {
   const asking = s.approvals.length, askingDl = s.approvals.filter(a => a.kind === "download").length;
   $("cnt-approvals").textContent = asking || "";
   $("cnt-downloads").textContent = askingDl || "";
-  put("jobs", table(["Job", "Schedule", "Next", "Last", ""], s.jobs.map(j => [
-    j.name, el("code", {}, j.schedule),
+  put("jobs", table(["Job", "Schedule", "Next run", "Last run", ""], s.jobs.map(j => [
+    j.name, el("code", {title: j.schedule}, j.schedule.replace(/^cron:/, "").replace(/^every:/, "every ")),
     j.enabled ? ago(j.next) : chip("paused", "warn"),
     j.running ? chip("running", "ok") : (j.last ? el("span", {class: j.last === "done" || j.last === "ok" ? "ok" : (j.last === "failed" ? "bad" : "")}, j.last + " " + ago(j.last_at)) : ""),
     el("span", {class: "row"},
@@ -261,13 +263,13 @@ function render(d) {
 
   const sl = $("job-skills"), names = s.skills.map(k => k.name).join(",");
   if (sl.dataset.n !== names) { sl.replaceChildren(...s.skills.map(k => el("option", {value: k.name}))); sl.dataset.n = names; }
-  put("skills", table(["Skill", "Origin", "Status", "Used", "Success"], s.skills.map(k => [
+  put("skills", table(["Skill", "Source", "Status", "Uses", "Success"], s.skills.map(k => [
     el("span", {}, k.name, k.review ? el("div", {class: "warn"}, k.review) : null),
-    k.origin, k.status === "active" ? "active" : chip(k.status, "warn"),
-    k.uses || "", k.rated ? Math.round(100 * k.success / k.rated) + "% of " + k.rated : ""])) || empty("No skills."));
+    k.origin === "builtin" ? "built-in" : k.origin, k.status === "active" ? "active" : chip(k.status, "warn"),
+    k.uses || "", k.rated ? el("span", {title: Math.round(100 * k.success / k.rated) + "% of " + k.rated + " rated runs"}, Math.round(100 * k.success / k.rated) + "% (" + k.rated + ")") : ""])) || empty("No skills."));
 
   put("learning", table(["Kind", "Why", "Status", "Result"], s.learning.map(l => [
-    l.kind, l.reason || "", l.status, el("span", {class: l.status === "failed" ? "bad" : "mute"}, l.result || l.last_error || "")])) || empty("Nothing queued."));
+    l.kind, l.reason || "", l.status, el("div", {class: l.status === "failed" ? "bad" : "mute"}, l.result || l.last_error || "")])) || empty("Nothing queued."));
   put("eval", table(["When", "Model", "Suite", "Passed"], s.eval.map(e => [
     ago(e.started_at), e.model, e.suite, e.passed + "/" + e.tasks])) || empty("No eval runs. Try noskill eval run."));
 }
