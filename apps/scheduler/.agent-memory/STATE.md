@@ -60,3 +60,14 @@ _Last updated: 2026-10-26 by Claude Code_
   uv-managed Python 3.12 (old one kept as `.venv.old-neolinux`, now ignored via `.venv.*/`).
   144 tests pass. Uncommitted: README.md, .gitignore.
 - The default model `granite4.2:3b` isn't installed; runs fall back to `granite4:3b`.
+
+## Update 2026-11-03 (retired: moved into noskill repo)
+
+- Working tree retired; this checkout keeps only `.agent-memory/`, `.gitignore` and the `MOVED.md` tombstone.
+- Code moved to `apps/scheduler/` in the noskill repo; branch `feature/describe-task` archived there.
+- During the move the task-verification work landed in the moved copy: `agent/verify.py`, task
+  frontmatter `sources:`/`checks:`, executor retry + statuses, store CHECK for `partial`/`failed`.
+- Live proof: `sched run daily-game-deals` -> fetch sources failed -> honest `FAILED (status=failed)` ->
+  retry -> final -> `partial` (sources failed, unbacked, min_report_links) -> "report written with
+  verification warnings (status=partial)". Daemon bug found and fixed: `write_report` got hardcoded
+  `status: "success"` while the honest verdict went to the DB/CLI; now uses `result.status`.

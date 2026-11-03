@@ -25,3 +25,9 @@ _Last updated: 2026-10-27 by Claude Code_
 
 - orcastrator is now the **Research** part of the noskill app (`~/dev/noskill/docs/APP.md`); README
   says so. The app runs `.venv/bin/orcastrator-web --port 8400` from this folder. Uncommitted: README.md.
+
+## Update 2026-11-03 (retired: moved into noskill repo)
+
+- Working tree retired; this checkout keeps only `.agent-memory/`, `.gitignore` and the `MOVED.md` tombstone.
+- Code moved to `apps/orcastrator/` in the noskill repo; branch `feature/setup-flag` archived there.
+- Full context: noskill repo `docs/APP.md`, `.agent-memory/STATE.md`, ADR-0017.
