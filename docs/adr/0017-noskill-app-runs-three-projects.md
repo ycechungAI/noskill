@@ -36,3 +36,7 @@ Command Line Tools). `noskill-tray` stays the cross-platform tray.
   into noskill's `deepresearch` engine, is still possible later (option 2); this app is the step
   before it, and its window wouldn't change.
 - The app needs the two Python projects' `.venv` folders, made by their own start scripts.
+
+**2026-11-03 update:** the two projects moved from `~/dev/orcastrator` / `~/dev/scheduler` into this
+repo (`apps/orcastrator/`, `apps/scheduler/`, `git subtree --squash`). The app's defaults and the
+moving parts (app.json, venvs, docs) point at the repo paths now; nothing above changes otherwise.

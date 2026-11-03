@@ -18,8 +18,8 @@ struct AppConfig: Codable, Equatable {
         AppConfig(
             noskillBinary: home + "/.local/bin/noskill",
             noskillDir: home + "/dev/noskill",
-            orcastratorDir: home + "/dev/orcastrator",
-            schedulerDir: home + "/dev/scheduler",
+            orcastratorDir: home + "/dev/noskill/apps/orcastrator",
+            schedulerDir: home + "/dev/noskill/apps/scheduler",
             ollamaPort: 11434, agentPort: 11435, researchPort: 8400, tasksPort: 8787,
             startAllOnLaunch: true)
     }

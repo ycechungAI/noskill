@@ -6,8 +6,8 @@ machine, with one window to use it from. It brings together three projects:
 | Part | What it does | Project folder | Port |
 |---|---|---|---|
 | **Agent** (noskill) | Skills, model routing, the OpenAI/Ollama proxy, jobs and approvals | `~/dev/noskill` | 11435 (status page at `/ui`) |
-| **Research** (orcastrator) | Long research reports: a planner, parallel researchers, a critic and a writer (STORM) | `~/dev/orcastrator` | 8400 |
-| **Tasks** (scheduler, `sched`) | Prompts that run on a cron schedule and save a Markdown report each time | `~/dev/scheduler` | 8787 |
+| **Research** (orcastrator) | Long research reports: a planner, parallel researchers, a critic and a writer (STORM) | `~/dev/noskill/apps/orcastrator` | 8400 |
+| **Tasks** (scheduler, `sched`) | Prompts that run on a cron schedule and save a Markdown report each time | `~/dev/noskill/apps/scheduler` | 8787 |
 
 All three run on **Ollama** (port 11434), which the app also starts if it isn't running.
 
@@ -117,7 +117,7 @@ when you finish Setup or choose a folder:
 |---|---|
 | `noskillBinary` | `~/.local/bin/noskill` |
 | `noskillDir` | `~/dev/noskill` (only used to build the agent when the app has none inside) |
-| `orcastratorDir`, `schedulerDir` | `~/dev/orcastrator`, `~/dev/scheduler` |
+| `orcastratorDir`, `schedulerDir` | `~/dev/noskill/apps/orcastrator`, `~/dev/noskill/apps/scheduler` |
 | `ollamaPort`, `agentPort`, `researchPort`, `tasksPort` | 11434, 11435, 8400, 8787 |
 | `startAllOnLaunch` | `true`; set `false` to press Start All yourself |
 

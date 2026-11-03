@@ -49,6 +49,7 @@
   .badge-error, .badge-timeout { background: rgba(190,50,50,0.15); color: #d15050; }
   .badge-running { background: rgba(210,150,0,0.18); color: #d19a00; }
   .badge-skipped_overlap { background: rgba(128,128,128,0.18); }
+  .badge-partial { background: rgba(210,150,0,0.18); color: #d19a00; }
 
   .schedule-line { font-size: 0.9rem; }
   .schedule-main { font-weight: 500; }
@@ -392,6 +393,7 @@ function renderTaskCard(t) {
   actions.appendChild(mkBtn('Run', () => runTask(t.id)));
   actions.appendChild(mkBtn(t.enabled ? 'Disable' : 'Enable', () => toggleEnabled(t.id, !t.enabled)));
   actions.appendChild(mkBtn('Delete', () => deleteTask(t.filename, t.id), 'danger'));
+  actions.lastChild.setAttribute('data-del', t.filename);
   return div;
 }
 
@@ -409,6 +411,7 @@ function renderInvalidCard(inv) {
   const actions = div.querySelector('.card-actions');
   actions.appendChild(mkBtn('Edit', () => openEdit(inv.filename)));
   actions.appendChild(mkBtn('Delete', () => deleteTask(inv.filename, null), 'danger'));
+  actions.lastChild.setAttribute('data-del', inv.filename);
   return div;
 }
 
@@ -557,9 +560,25 @@ async function saveTask() {
 }
 
 async function deleteTask(filename, taskId) {
-  if (!confirm(`Delete task file ${filename}? Run history is kept.`)) return;
-  await api('/api/tasks/file/' + encodeURIComponent(filename), {method: 'DELETE'});
-  refresh();
+  // No window.confirm(): the noskill app embeds this page in a WKWebView
+  // whose JS confirm silently returns false, making Delete dead there. A
+  // two-step button works in every container.
+  const buttons = document.querySelectorAll(`.task-actions [data-del="${filename}"]`);
+  if (!buttons.length || buttons[0].dataset.armed) {
+    await api('/api/tasks/file/' + encodeURIComponent(filename), {method: 'DELETE'});
+    refresh();
+    return;
+  }
+  for (const b of buttons) {
+    b.dataset.armed = '1';
+    b.textContent = 'Really delete?';
+  }
+  setTimeout(() => {
+    for (const b of document.querySelectorAll(`[data-del="${filename}"][data-armed]`)) {
+      delete b.dataset.armed;
+      b.textContent = 'Delete';
+    }
+  }, 4000);
 }
 
 async function toggleEnabled(taskId, enable) {

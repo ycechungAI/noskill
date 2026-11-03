@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -17,6 +17,10 @@ class RunResult:
     iterations: int
     tool_calls: int
     model: str
+    # Deterministic verification verdict (agent/verify.py): success / partial
+    # / failed. RunResults built by hand (tests) default to success.
+    status: str = "success"
+    check_failures: list[str] = field(default_factory=list)
 
 
 def _template_vars(when: datetime) -> dict:
@@ -76,6 +80,13 @@ def write_report(
         text = result.report.rstrip() + "\n"
     else:
         duration_str = format_duration(finished - started)
+        checks = ""
+        if result.check_failures:
+            checks = (
+                "checks_failed: "
+                + " | ".join(result.check_failures)
+                + "\n"
+            )
         frontmatter = (
             "---\n"
             f"task: {task_id}\n"
@@ -83,6 +94,7 @@ def write_report(
             f"trigger: {trigger}\n"
             f"started: {started.isoformat()}\n"
             f"status: {status}\n"
+            f"{checks}"
             "---\n\n"
         )
         footer = (

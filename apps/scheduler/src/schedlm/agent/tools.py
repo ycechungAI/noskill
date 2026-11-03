@@ -15,7 +15,9 @@ from ddgs import DDGS
 
 logger = logging.getLogger(__name__)
 
-_USER_AGENT = "sched/1.0"
+# A descriptive UA: some APIs (e.g. CheapShark) reject "generic" UAs; the URL
+# is a placeholder until PACKAGING.md decides the home in the noskill repo.
+_USER_AGENT = "sched/1.0 (local task scheduler; https://github.com/ycechungAI/noskill)"
 _MAX_REDIRECTS = 3
 _FETCH_TIMEOUT_SECONDS = 10.0
 
@@ -24,7 +26,11 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "Search the web. Returns JSON list of {title, url, snippet}.",
+            "description": (
+                "Search the web. Returns JSON list of {title, url, snippet}. "
+                "Pass keywords, not URLs and not '#'-fragment strings; URLs "
+                "belong in fetch_page."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -170,8 +176,21 @@ def fetch_page(
     max_chars: int = 8000,
     compress: Callable[[str, str], str] | None = None,
 ) -> str:
+    notes = []
     if not url:
         return '<fetched_content url="">error: empty url</fetched_content>'
+    # The part of a URL after # is browser-only state (a page's filter/sort
+    # settings, e.g. isthereanydeal's "#filter:...;sort:expiry") and never
+    # reaches the server, so any fetch returns the page without it. Tell the
+    # model this once, in the result, instead of letting it assume the fetch
+    # honored its filter.
+    if "#" in url:
+        notes.append(
+            "note: the '#' part of this URL is browser-only state (filters/sort) "
+            "and never reaches the server; this is the unfiltered page -- apply "
+            "any filtering yourself from the content, or use a source that "
+            "returns the filtered data directly"
+        )
     try:
         with httpx.Client(
             headers={"User-Agent": _USER_AGENT},
@@ -189,16 +208,26 @@ def fetch_page(
         return f'<fetched_content url="{url}">error: HTTP {resp.status_code}</fetched_content>'
 
     content_type = resp.headers.get("content-type", "")
-    if "html" not in content_type and "text" not in content_type:
+    # JSON APIs are first-class fetch targets (deal lists, exchange rates,
+    # release feeds): render them as text like any other page so the model can
+    # pull records out of them.
+    if "json" in content_type or url.split("?")[0].endswith(".json"):
+        try:
+            data = json.loads(resp.text)
+            text = json.dumps(data, indent=2, ensure_ascii=False)
+            notes.append("note: this URL returns JSON data, not a web page")
+        except ValueError:
+            text = resp.text
+    elif "html" in content_type or "text" in content_type:
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer"]):
+            tag.decompose()
+        text = soup.get_text(" ", strip=True)
+    else:
         return (
             f'<fetched_content url="{url}">error: unsupported content-type '
             f'{content_type or "unknown"}</fetched_content>'
         )
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-    for tag in soup(["script", "style", "nav", "footer"]):
-        tag.decompose()
-    text = soup.get_text(" ", strip=True)
 
     if len(text) > max_chars:
         if compress is not None:
@@ -209,11 +238,23 @@ def fetch_page(
         else:
             text = text[:max_chars]
 
+    if notes:
+        text = "\n".join(notes) + "\n\n" + text
     return f'<fetched_content url="{url}">{text}</fetched_content>'
 
 
 def current_datetime() -> str:
     return datetime.now().astimezone().isoformat()
+
+
+def is_error_result(result: str) -> bool:
+    """True when a tool's result is an error string (web_search/fetch_page
+    failure JSON, or a failed <fetched_content>). Verification uses this to
+    judge whether the run actually gathered evidence."""
+    return (
+        result.startswith('{"error"')
+        or (result.startswith('<fetched_content') and ">error: " in result)
+    )
 
 
 def _safe_note_path(name: str, notes_dir: Path) -> Path:

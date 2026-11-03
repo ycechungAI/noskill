@@ -9,7 +9,7 @@ import schedlm.agent.executor as executor_module
 from schedlm.agent import tools as tools_module
 from schedlm.agent.executor import run_task
 from schedlm.config import AgentConfig, Config, PathsConfig
-from schedlm.tasks import OutputSpec, Task
+from schedlm.tasks import ChecksSpec, OutputSpec, Task
 
 
 @dataclass
@@ -418,3 +418,50 @@ def test_run_task_swaps_out_installed_model_that_cannot_chat(tmp_path, monkeypat
 
     assert result.model == "gemma3:1b"
     assert any("'nomic-embed-text:latest' can't chat" in e for e in events)
+
+
+def test_run_task_retries_then_succeeds_when_report_unbacked(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        executor_module,
+        "execute",
+        lambda name, args, ctx: (
+            json.dumps([{"title": "t", "url": args.get("url", "https://example.com"), "snippet": "s"}])
+            if name == "web_search"
+            else f'<fetched_content url="{args.get("url")}">deals text</fetched_content>'
+        ),
+    )
+    task = make_task(tmp_path)
+    task.sources = ["https://example.com/deals"]
+    task.checks = ChecksSpec(require_cited_sources=True, min_report_links=1)
+    cfg = make_cfg(tmp_path, agent=AgentConfig(max_iterations=6))
+
+    fetch_ok = FakeToolCall(FakeFunction("fetch_page", {"url": "https://example.com/deals"}))
+    responses = [
+        FakeResponse(FakeMessage(tool_calls=[fetch_ok])),
+        # unbacked: the "report" cites no URL the run really got
+        FakeResponse(FakeMessage(content="# Deals\n\n| Made Up | $1 | ...")),
+        # fixed after the CHECKS_FAILED retry
+        FakeResponse(FakeMessage(content="# Deals\n\n| Real | $1 |\n\nhttps://example.com/deals")),
+    ]
+    result = run_task(task, cfg, client=FakeOllamaClient(responses))
+
+    assert result.status == "success"
+    assert result.check_failures == []
+
+
+def test_run_task_records_failed_when_no_web_evidence(tmp_path, monkeypatch):
+    monkeypatch.setattr(executor_module, "execute", lambda name, args, ctx: '{"error": "search unavailable"}')
+    task = make_task(tmp_path)
+    task.sources = ["https://example.com/deals"]
+    task.checks = ChecksSpec(require_sources=True, require_cited_sources=True)
+    cfg = make_cfg(tmp_path, agent=AgentConfig(max_iterations=6))
+
+    responses = [
+        FakeResponse(FakeMessage(tool_calls=[FakeToolCall(FakeFunction("web_search", {"query": "x"}))])),
+        FakeResponse(FakeMessage(content="# Deals\n\nnothing here")),
+        FakeResponse(FakeMessage(content="# Deals\n\nstill nothing")),
+    ]
+    result = run_task(task, cfg, client=FakeOllamaClient(responses))
+
+    assert result.status == "failed"
+    assert result.check_failures

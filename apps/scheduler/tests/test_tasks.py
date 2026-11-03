@@ -11,6 +11,8 @@ from schedlm.tasks import (
     content_hash,
     load_tasks_dir,
     parse_task_file,
+    parse_task_text,
+    render_task_file,
     set_enabled,
     set_model,
     write_task_file,
@@ -185,3 +187,43 @@ def test_set_model_replaces_then_clears(tmp_path):
 
     assert parse_task_file(path).model is None
     assert path.read_text() == MODEL_TASK
+
+
+def test_sources_and_checks_parse_and_round_trip(tmp_path):
+    src = tmp_path / "deals.md"
+    src.write_text(
+        "---\nid: daily-game-deals\nname: Check Game Deals\nschedule: \"0 6 * * *\"\n"
+        "sources:\n- https://www.cheapshark.com/api/1.0/deals?onSale=1&upperPrice=10\n"
+        "checks:\n  require_cited_sources: true\n  min_report_links: 3\n"
+        "---\n\nFind deals.\n"
+    )
+    task = parse_task_file(src)
+    assert task.sources == ["https://www.cheapshark.com/api/1.0/deals?onSale=1&upperPrice=10"]
+    assert task.checks.require_cited_sources is True
+    assert task.checks.min_report_links == 3
+    assert task.checks.require_sources is True
+
+    rewritten = dataclasses.replace(task, path=tmp_path / "rewritten.md")
+    text = render_task_file(rewritten)
+    reparsed = parse_task_text(text, task.path)
+    assert reparsed.sources == task.sources
+    assert reparsed.checks.min_report_links == 3
+    assert reparsed.checks.require_cited_sources is True
+
+
+def test_sources_bad_url_rejected(tmp_path):
+    path = tmp_path / "bad.md"
+    path.write_text(
+        "---\nid: bad-source\nschedule: \"0 7 * * *\"\nsources:\n- not-a-url\n---\n\nDo it.\n"
+    )
+    with pytest.raises(TaskValidationError, match="sources"):
+        parse_task_file(path)
+
+
+def test_checks_unknown_key_rejected(tmp_path):
+    path = tmp_path / "bad-checks.md"
+    path.write_text(
+        "---\nid: bad-checks\nschedule: \"0 7 * * *\"\nchecks:\n  bogus: true\n---\n\nDo it.\n"
+    )
+    with pytest.raises(TaskValidationError, match="checks"):
+        parse_task_file(path)

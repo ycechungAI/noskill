@@ -50,7 +50,7 @@ import Testing
     @Test func missingProgramsAreNotInstalled() {
         let specs = Catalog.specs(cfg, isExecutable: { _ in false })
         #expect(specs.allSatisfy { !$0.installed })
-        #expect(specs.first { $0.id == .research }!.installHint.contains("/h/dev/orcastrator"))
+        #expect(specs.first { $0.id == .research }!.installHint.contains("/h/dev/noskill/apps/orcastrator"))
     }
 
     @Test func runsEachProjectsOwnProgram() {
@@ -58,13 +58,13 @@ import Testing
         func s(_ id: ServiceID) -> ServiceSpec { specs.first { $0.id == id }! }
         #expect(s(.agent).executable == "/h/.local/bin/noskill")
         #expect(s(.agent).arguments == ["serve"])
-        #expect(s(.research).executable == "/h/dev/orcastrator/.venv/bin/orcastrator-web")
+        #expect(s(.research).executable == "/h/dev/noskill/apps/orcastrator/.venv/bin/orcastrator-web")
         #expect(s(.research).arguments == ["--port", "8400"])
-        #expect(s(.research).workingDirectory == "/h/dev/orcastrator")
+        #expect(s(.research).workingDirectory == "/h/dev/noskill/apps/orcastrator")
         #expect(s(.tasksDaemon).arguments == ["daemon"])
         #expect(s(.tasksDaemon).port == nil)
         #expect(s(.tasksWeb).arguments == ["serve", "--port", "8787"])
-        #expect(s(.tasksWeb).workingDirectory == "/h/dev/scheduler")
+        #expect(s(.tasksWeb).workingDirectory == "/h/dev/noskill/apps/scheduler")
         #expect(s(.agent).page?.absoluteString == "http://127.0.0.1:11435/ui")
     }
 
@@ -82,7 +82,7 @@ import Testing
         let pattern = Catalog.specs(cfg, isExecutable: { _ in true }).first { $0.id == .tasksDaemon }!.processPattern!
         let re = try NSRegularExpression(pattern: pattern)
         func matches(_ s: String) -> Bool { re.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil }
-        #expect(matches("/h/dev/scheduler/.venv/bin/python /h/dev/scheduler/.venv/bin/sched daemon"))
+        #expect(matches("/h/dev/noskill/apps/scheduler/.venv/bin/python /h/dev/noskill/apps/scheduler/.venv/bin/sched daemon"))
         #expect(matches(".venv/bin/python -m schedlm.cli daemon"))
         #expect(!matches("/h/.local/bin/noskill daemon start"))
         #expect(!matches(".venv/bin/sched daemonize"))

@@ -417,6 +417,12 @@ def _run_one(
         typer.echo(f"----- {task.id} report -----")
         typer.echo(Path(report_path).read_text().rstrip())
         typer.echo(f"----- end {task.id} report -----")
+    elif status == "partial":
+        typer.echo(
+            f"[{task.id}] report written with verification warnings (status=partial) "
+            f"-- see the checks_failed block in {report_path}",
+            err=True,
+        )
     else:
         typer.echo(
             f"[{task.id}] FAILED (status={status}) -- see `sched logs {task.id}`",

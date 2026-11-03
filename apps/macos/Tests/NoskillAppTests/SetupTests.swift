@@ -93,7 +93,7 @@ private func finding(_ part: SetupPart, _ f: MachineFacts) -> Finding {
         var f = healthy()
         // d---r-x--- as left by a copy from another user (docs/APP.md "Setup").
         f.research.folder = PathFact(exists: true, isDirectory: true, ownerBits: 0)
-        #expect(finding(.research, f).fix == .repairPermissions("/h/dev/orcastrator"))
+        #expect(finding(.research, f).fix == .repairPermissions("/h/dev/noskill/apps/orcastrator"))
         #expect(finding(.research, f).level == .problem)
         // The noskill source only matters once the agent is installed: a note, not a problem.
         f = healthy()
@@ -124,9 +124,9 @@ private func finding(_ part: SetupPart, _ f: MachineFacts) -> Finding {
         f.research.hasSetupScript = true
         f.research.venv = .missing
         f.hasUV = false
-        #expect(finding(.research, f).fix == .buildVenv(.research, dir: "/h/dev/orcastrator", needsUV: true, needsPython: false))
+        #expect(finding(.research, f).fix == .buildVenv(.research, dir: "/h/dev/noskill/apps/orcastrator", needsUV: true, needsPython: false))
         f.tasks.venv = .broken("Its Python doesn't start.")
-        #expect(finding(.tasks, f).fix == .buildVenv(.tasks, dir: "/h/dev/scheduler", needsUV: true, needsPython: false))
+        #expect(finding(.tasks, f).fix == .buildVenv(.tasks, dir: "/h/dev/noskill/apps/scheduler", needsUV: true, needsPython: false))
         #expect(finding(.tasks, f).why!.hasPrefix("Its Python doesn't start."))
     }
 
@@ -150,9 +150,9 @@ private func finding(_ part: SetupPart, _ f: MachineFacts) -> Finding {
 }
 
 @Suite struct VenvTests {
-    let real = "/h/dev/scheduler/.venv"
+    let real = "/h/dev/noskill/apps/scheduler/.venv"
     func state(home: String? = "home = /h/.local/bin", runs: Bool? = true, prog: Bool = true,
-               shebang: String? = "#!/h/dev/scheduler/.venv/bin/python3.12") -> VenvState {
+               shebang: String? = "#!/h/dev/noskill/apps/scheduler/.venv/bin/python3.12") -> VenvState {
         VenvState.of(exists: true, home: home, pythonRuns: runs, program: "sched", programExists: prog,
                      shebang: shebang, venvRealPath: real)
     }
@@ -175,7 +175,7 @@ private func finding(_ part: SetupPart, _ f: MachineFacts) -> Finding {
     }
 
     @Test func aMovedFolderLeavesTheProgramPointingElsewhere() {
-        #expect(state(shebang: "#!/Users/someone/dev/scheduler/.venv/bin/python3.12") != .ok)
+        #expect(state(shebang: "#!/Users/someone/dev/noskill/apps/scheduler/.venv/bin/python3.12") != .ok)
     }
 }
 

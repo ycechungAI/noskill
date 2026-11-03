@@ -2,7 +2,7 @@
 
 > **Part of the noskill app.** This is the **Tasks** part of the noskill app (`~/dev/noskill`, see
 > `docs/APP.md` there), which starts it together with the noskill agent (`~/dev/noskill`) and the
-> research reports of orcastrator (`~/dev/orcastrator`) and shows its web page in one window. It
+> research reports of orcastrator (`apps/orcastrator/` in this repo, `~/dev/noskill`) and shows its web page in one window. It
 > still runs on its own with `./start.sh` and `./web.sh`.
 >
 > The app runs `.venv/bin/sched daemon` and `.venv/bin/sched serve --port 8787` from this folder

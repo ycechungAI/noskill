@@ -102,3 +102,60 @@ def test_startup_recovery_marks_running_as_error(tmp_path):
 
     task_row = store.get_task_state(conn, "t1")
     assert task_row["running_pid"] is None
+
+
+# --- verification / statuses (2026-11-03: honest run statuses) -----------------
+
+
+def test_init_allows_partial_status(tmp_path):
+    conn = store.init_db(tmp_path / "sched.db")
+    run_id = store.start_run(conn, "t1", "manual", "2026-11-03T05:00:00", model="m")
+    store.finish_run(
+        conn,
+        run_id,
+        status="partial",
+        finished_at="2026-11-03T05:02:00",
+    )
+    rows = store.list_runs(conn, "t1", limit=5)
+    assert rows[0]["status"] == "partial"
+
+
+def test_init_migrates_old_schema_lacking_partial(tmp_path):
+    db = tmp_path / "sched.db"
+    conn = store.init_db(db)
+    run_id = store.start_run(conn, "t1", "manual", "2026-11-03T05:00:00", model="m")
+    store.finish_run(
+        conn, run_id, status="success", finished_at="2026-11-03T05:02:00"
+    )
+    conn.close()
+
+    conn2 = store.sqlite3.connect(str(db))
+    conn2.execute("DROP TABLE runs")
+    conn2.execute(
+        """
+        CREATE TABLE runs (
+            run_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id       TEXT NOT NULL,
+            trigger       TEXT NOT NULL CHECK (trigger IN ('schedule','manual','catchup')),
+            started_at    TEXT NOT NULL,
+            finished_at   TEXT,
+            status        TEXT NOT NULL CHECK
+                (status IN ('running','success','error','timeout','skipped_overlap')),
+            report_path   TEXT,
+            error         TEXT,
+            model         TEXT,
+            iterations    INTEGER,
+            tool_calls    INTEGER
+        );
+        """
+    )
+    conn2.execute(
+        "INSERT INTO runs (task_id, trigger, started_at, status) VALUES ('t1','manual','2026-11-03T05:00:00','success')"
+    )
+    conn2.commit()
+    conn2.close()
+
+    conn3 = store.init_db(db)  # must migrate without raising and keep the row
+    rows = store.list_runs(conn3, "t1", limit=5)
+    assert rows[0]["status"] == "success"
+    conn3.close()

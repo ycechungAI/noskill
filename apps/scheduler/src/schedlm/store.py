@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at    TEXT NOT NULL,
     finished_at   TEXT,
     status        TEXT NOT NULL CHECK
-        (status IN ('running','success','error','timeout','skipped_overlap')),
+        (status IN ('running','success','partial','error','timeout','skipped_overlap')),
     report_path   TEXT,
     error         TEXT,
     model         TEXT,
@@ -45,8 +45,44 @@ def init_db(path: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    _migrate(conn)
     conn.commit()
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Forward-only migrations (DataModel.md §2). SQLite can't alter a CHECK
+    constraint, so one that lacks 'partial' (pre-verification databases) is
+    rebuilt with its rows copied across."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='runs'"
+    ).fetchone()
+    if row is None or "partial" in row["sql"]:
+        return
+    conn.executescript(
+        """
+        BEGIN;
+        CREATE TABLE runs_new (
+            run_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id       TEXT NOT NULL,
+            trigger       TEXT NOT NULL CHECK (trigger IN ('schedule','manual','catchup')),
+            started_at    TEXT NOT NULL,
+            finished_at   TEXT,
+            status        TEXT NOT NULL CHECK
+                (status IN ('running','success','partial','error','timeout','skipped_overlap')),
+            report_path   TEXT,
+            error         TEXT,
+            model         TEXT,
+            iterations    INTEGER,
+            tool_calls    INTEGER
+        );
+        INSERT INTO runs_new SELECT * FROM runs;
+        DROP TABLE runs;
+        ALTER TABLE runs_new RENAME TO runs;
+        CREATE INDEX IF NOT EXISTS idx_runs_task ON runs(task_id, started_at DESC);
+        COMMIT;
+        """
+    )
 
 
 def recover_running_state(conn: sqlite3.Connection) -> None:

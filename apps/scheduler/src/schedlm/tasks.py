@@ -34,8 +34,11 @@ _KNOWN_KEYS = {
     "timeout_minutes",
     "catchup",
     "output",
+    "sources",
+    "checks",
 }
 _KNOWN_OUTPUT_KEYS = {"keep", "dir", "filename", "raw"}
+_KNOWN_CHECK_KEYS = {"require_sources", "min_report_links", "require_cited_sources"}
 
 
 class TaskValidationError(Exception):
@@ -51,6 +54,22 @@ class OutputSpec:
 
 
 @dataclass
+class ChecksSpec:
+    """Deterministic verification of a run (executor.py / verify.py).
+
+    `require_sources` (default True when the task has `sources:`) fails the run
+    unless every listed URL was fetched successfully. `min_report_links` fails
+    the run unless the report cites at least that many distinct URLs.
+    `require_cited_sources` fails the run whose report cites no URL the run
+    actually fetched or found via search (the classic small-model fabrication:
+    a table built from homepage snippets)."""
+
+    require_sources: bool = True
+    min_report_links: int | None = None
+    require_cited_sources: bool = False
+
+
+@dataclass
 class Task:
     id: str
     name: str
@@ -62,6 +81,8 @@ class Task:
     timeout_minutes: int = 10
     catchup: bool = False
     output: OutputSpec = field(default_factory=OutputSpec)
+    sources: list[str] = field(default_factory=list)
+    checks: ChecksSpec = field(default_factory=ChecksSpec)
     prompt: str = ""
     path: Path = field(default_factory=Path)
 
@@ -171,6 +192,38 @@ def parse_task_text(text: str, path: Path) -> Task:
     if not isinstance(raw_flag, bool):
         raise TaskValidationError("output.raw: must be true or false")
 
+    sources_raw = fm.get("sources") or []
+    if not isinstance(sources_raw, list):
+        raise TaskValidationError("sources: must be a list of URLs")
+    sources: list[str] = []
+    for url in sources_raw:
+        if not isinstance(url, str) or not re.fullmatch(r"https?://\S+", url):
+            raise TaskValidationError(f"sources: '{url}' is not an http(s) URL")
+        if url not in sources:
+            sources.append(url)
+
+    checks_raw = fm.get("checks") or {}
+    if not isinstance(checks_raw, dict):
+        raise TaskValidationError("checks: must be a mapping")
+    for key in checks_raw:
+        if key not in _KNOWN_CHECK_KEYS:
+            raise TaskValidationError(f"checks: unknown key '{key}'")
+    require_sources = checks_raw.get("require_sources", True)
+    if not isinstance(require_sources, bool):
+        raise TaskValidationError("checks.require_sources: must be true or false")
+    min_report_links = checks_raw.get("min_report_links")
+    if min_report_links is not None and (
+        not isinstance(min_report_links, int)
+        or isinstance(min_report_links, bool)
+        or min_report_links < 1
+    ):
+        raise TaskValidationError(
+            "checks.min_report_links: must be a positive integer"
+        )
+    require_cited = checks_raw.get("require_cited_sources", False)
+    if not isinstance(require_cited, bool):
+        raise TaskValidationError("checks.require_cited_sources: must be true or false")
+
     name = fm.get("name", raw_id)
     if not isinstance(name, str):
         raise TaskValidationError("name: must be a string")
@@ -186,6 +239,12 @@ def parse_task_text(text: str, path: Path) -> Task:
         timeout_minutes=timeout_minutes,
         catchup=catchup,
         output=OutputSpec(keep=keep, dir=out_dir, filename=filename, raw=raw_flag),
+        sources=sources,
+        checks=ChecksSpec(
+            require_sources=require_sources,
+            min_report_links=min_report_links,
+            require_cited_sources=require_cited,
+        ),
         prompt=body,
         path=path,
     )
@@ -233,6 +292,17 @@ def render_task_file(task: Task) -> str:
     fm["tools"] = list(task.tools)
     fm["timeout_minutes"] = task.timeout_minutes
     fm["catchup"] = task.catchup
+    if task.sources:
+        fm["sources"] = list(task.sources)
+    checks: dict = {}
+    if not task.checks.require_sources:
+        checks["require_sources"] = False
+    if task.checks.min_report_links is not None:
+        checks["min_report_links"] = task.checks.min_report_links
+    if task.checks.require_cited_sources:
+        checks["require_cited_sources"] = True
+    if checks:
+        fm["checks"] = checks
 
     output: dict = {"keep": task.output.keep}
     if task.output.dir:

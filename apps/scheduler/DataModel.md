@@ -27,6 +27,24 @@ Write a brief with the 5 most important items. For each: one-line summary,
 why it matters, and the source URL. End with a "Worth watching" section.
 ```
 
+### Source and check requirements (2026-11-03)
+
+Task frontmatter gained two optional keys:
+
+- `sources:` — list of `http(s)://` URLs the task requires the executor to actually fetch with
+  `fetch_page`. The executor appends them as a numbered imperative block after the prompt, and
+  verification fails the run (`required_source_not_fetched` / `required_source_failed`) when a
+  source wasn't (or couldn't be) fetched.
+- `checks:` — mapping of opt-in verification knobs: `require_sources` (default true when
+  `sources` exist), `min_report_links` (minimum distinct URLs the final report must cite),
+  `require_cited_sources` (fail when the report cites no URL the run actually fetched or got
+  from search). Unknown check keys → validation error (stricter than unknown frontmatter keys).
+
+Verification then runs at finalization (`agent/verify.py`, executor `finish()`): `failed` when no
+verifiable web evidence was gathered, `partial` when checks were unmet, `success` when all the
+task's required checks pass. Tasks with requirements get one bounded retry (`CHECKS_FAILED`) that
+names each failed check.
+
 ### Output destination templating
 
 `output.dir` / `output.filename` support `str.format` variables resolved at run time in the local timezone: `{year}` (2026), `{month02}` (07), `{month_name}` (July), `{day}` (18, no pad), `{day02}` (18), `{iso_date}` (2026-07-18), `{iso_datetime}` (2026-07-18T07-00). `report.py` expands `~`, creates missing directories, and overwrites an existing file at the same resolved path (idempotent re-runs). Pruning (`keep`) applies **only** when `dir` is unset (default `runs/<id>/`); custom destinations are never pruned. With `raw: true` the report body is written verbatim — no frontmatter, no footer. The DB `report_path` always records the resolved path.
@@ -36,6 +54,7 @@ Validation rules (implement in `tasks.py`):
 2. Exactly one of `schedule` / `fire_at`. `schedule` must satisfy `croniter.is_valid`; `fire_at` must parse as ISO-8601.
 3. `tools` entries must exist in the registry (Agents.md §3).
 4. Unknown frontmatter keys → warning, not error (forward compatibility).
+5. `sources` entries must be valid `http(s)://` URLs; `checks` keys must be known (see §1).
 
 ## 2. SQLite schema (`data/sched.db`, WAL mode)
 
@@ -57,7 +76,7 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at    TEXT NOT NULL,             -- UTC ISO-8601
     finished_at   TEXT,
     status        TEXT NOT NULL CHECK
-        (status IN ('running','success','error','timeout','skipped_overlap')),
+        (status IN ('running','success','partial','error','timeout','skipped_overlap')),
     report_path   TEXT,
     error         TEXT,
     model         TEXT,
@@ -84,6 +103,7 @@ run_id: 42
 trigger: schedule
 started: 2026-07-18T07:00:02+08:00
 status: success
+checks_failed: unbacked_report: the report cites no URL this run actually fetched or found via search -- every figure in it is unbacked
 ---
 
 # Morning Brief — 2026-07-18

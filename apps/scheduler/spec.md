@@ -50,6 +50,7 @@ Existing ("old") tasks are plain Markdown files that can be dropped into `tasks/
 ### Execution
 - FR-9: Execution = tool-calling chat loop against Ollama `/api/chat` with the task's model (default from config). Max `max_iterations` (default 12) tool rounds, then forced finalization.
 - FR-10: Tools available per task are declared in frontmatter from the fixed registry: `web_search`, `fetch_page`, `current_datetime`, `read_note`, `write_note` (see Agents.md). Unknown tool names are a validation error.
+- FR-10a: Tasks may declare optional frontmatter requirements that the verification gate enforces: `sources:` (URLs that must be fetched via `fetch_page`) and `checks:` (per-check knobs: `require_sources`, `min_report_links`, `require_cited_sources`). See DataModel.md §1.
 - FR-11: Each run has a wall-clock timeout (`timeout_minutes`, default 10). On timeout the run is marked `timeout` and a partial report is written if any content exists.
 - FR-12: The final assistant message is written as the run report (format in DataModel.md). Reports are pruned to the newest `output.keep` (default 30) per task.
 - FR-12a: A task may set `output.dir` / `output.filename` with date template variables (e.g. `~/dev/briefing/{year}/{month_name}/day{day}.md`) and `output.raw: true` to write the model output verbatim to a custom location; directories are created as needed and custom destinations are never pruned (DataModel.md §1).
@@ -62,7 +63,7 @@ Existing ("old") tasks are plain Markdown files that can be dropped into `tasks/
 ### Management
 - FR-16: CLI per API.md: `list`, `add`, `show`, `run`, `enable`, `disable`, `rm`, `logs`, `daemon`.
 - FR-17: `sched add --nl "<sentence>"` uses the Planner agent to draft a task file, prints it, and asks for confirmation (`--yes` to skip) before writing.
-- FR-18: History persisted in SQLite: every run's start/end, status (`success|error|timeout|skipped_overlap`), trigger (`schedule|manual|catchup`), report path, error text, iterations used.
+- FR-18: History persisted in SQLite: every run's start/end, status (`success|partial|error|timeout|skipped_overlap`), trigger (`schedule|manual|catchup`), report path, error text, iterations used.
 
 ## 6. Non-functional requirements
 

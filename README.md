@@ -38,7 +38,7 @@ noskill is a planned runtime that gives **local models** (Ollama, LM Studio, lla
 > **Status: Phase 3 and in use on macOS.** The runtime, learning loop, skill optimisation, scheduler, anime-tracker, signed skill registry and an opt-in LoRA pipeline are built and tested on macOS against a real Ollama. Linux and Windows build and vet cleanly but haven't been run on real machines. No release, installer or website is published yet; the GitHub org, signing key and domain are decided last ([PACKAGING.md](docs/PACKAGING.md)). This repo also holds the spec, the design docs and the Phase 0 test harness (`spikes/`, Python).
 
 ## The noskill app (macOS prototype)
-One app that starts and runs noskill together with two sibling projects, **orcastrator** (long research reports, `~/dev/orcastrator`) and **sched** (prompts on a cron schedule, `~/dev/scheduler`), plus Ollama. Start All brings them all up, and one window shows each one's page with a menu-bar icon for status. Build it with `apps/macos/build-app.sh`. What it runs and how: [docs/APP.md](docs/APP.md).
+One app that starts and runs noskill together with two sibling projects it hosts in this repo, **orcastrator** (long research reports, `apps/orcastrator/`) and **sched** (prompts on a cron schedule, `apps/scheduler/`; both moved into the repo on 2026-11-03, original folders `~/dev/orcastrator` and `~/dev/scheduler` retired), plus Ollama. Start All brings them all up, and one window shows each one's page with a menu-bar icon for status. Build it with `apps/macos/build-app.sh`. What it runs and how: [docs/APP.md](docs/APP.md).
 
 ![The app's Ollama pane: model list, download box, ollama.com sign-in and a chat panel](apps/macos/screenshots/ollama.png)
 

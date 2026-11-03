@@ -2,7 +2,7 @@
 
 > **Part of the noskill app.** This is the **Research** part of the noskill app (`~/dev/noskill`,
 > see `docs/APP.md` there), which starts it together with the noskill agent (`~/dev/noskill`) and
-> the task scheduler (`~/dev/scheduler`) and shows its page in one window. It still runs on its own
+> the task scheduler (sched, `apps/scheduler/` in this repo, `~/dev/noskill`) and shows its page in one window. It still runs on its own
 > with `./start.sh`.
 >
 > The app runs `.venv/bin/orcastrator-web --port 8400` from this folder and checks that port, so keep

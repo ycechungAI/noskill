@@ -301,7 +301,7 @@ def execute_and_record(
         store_mod.finish_run(
             conn,
             run_id,
-            status="success",
+            status=result.status,
             finished_at=finished.isoformat(),
             report_path=str(report_path),
             iterations=result.iterations,
@@ -309,12 +309,13 @@ def execute_and_record(
             model=result.model,
         )
         logger.info(
-            "[%s] run finished status=success model=%s report=%s",
+            "[%s] run finished status=%s model=%s report=%s",
             task.id,
+            result.status,
             result.model,
             report_path,
         )
-        return "success", str(report_path)
+        return result.status, str(report_path)
     finally:
         conn.execute(
             "UPDATE task_state SET running_pid=NULL, last_run_at=? WHERE id=?",
