@@ -1,0 +1,4 @@
+# Runtime dependencies. For development install the package instead: pip install -e ".[dev]"
+ollama>=0.3.0
+fastapi>=0.110
+uvicorn>=0.29

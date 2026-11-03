@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orcastrator"
+version = "0.1.0"
+description = "STORM-style multi-agent research report generator over Ollama"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ollama>=0.3.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+orcastrator = "orcastrator.cli:main"
+orcastrator-web = "orcastrator.web:main"
+
+[tool.setuptools]
+packages = ["orcastrator"]
+
+[tool.setuptools.package-data]
+orcastrator = ["static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

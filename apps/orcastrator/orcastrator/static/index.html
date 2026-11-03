@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orcastrator — Research Report Generator</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1a1d21; --muted: #5c6470;
+    --border: #dde1e6; --accent: #2563eb; --accent-text: #ffffff;
+    --ok: #15803d; --warn: #b45309; --err: #b91c1c; --code-bg: #eef1f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171b; --panel: #1d2126; --text: #e8eaed; --muted: #9aa3ad;
+      --border: #2e343b; --accent: #4c8dff; --accent-text: #ffffff;
+      --ok: #4ade80; --warn: #fbbf24; --err: #f87171; --code-bg: #262b31;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  header h1 { margin: 0 0 .25rem; font-size: 1.6rem; }
+  header p { margin: 0 0 1.5rem; color: var(--muted); }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem;
+  }
+  label { display: block; font-weight: 600; margin-bottom: .35rem; }
+  .hint { font-weight: 400; color: var(--muted); font-size: .85rem; }
+  input, select {
+    width: 100%; padding: .6rem .75rem; font-size: 1rem;
+    color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; gap: .75rem; margin-top: .9rem; flex-wrap: wrap; }
+  .row > div { flex: 1 1 140px; }
+  details { margin-top: 1rem; }
+  summary { cursor: pointer; color: var(--muted); user-select: none; }
+  .actions { display: flex; gap: .75rem; margin-top: 1.1rem; align-items: center; }
+  button {
+    padding: .6rem 1.3rem; font-size: 1rem; font-weight: 600;
+    border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+    background: var(--panel); color: var(--text);
+  }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  #status { color: var(--muted); font-size: .9rem; }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px; vertical-align: -2px;
+    border: 2px solid var(--muted); border-top-color: transparent;
+    border-radius: 50%; animation: spin .8s linear infinite; margin-right: .4rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* progress dashboard */
+  .progress-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.1rem; }
+  .progress-head h2 { margin: 0; font-size: 1.05rem; }
+  .timer { font: 700 1.25rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .timer .lbl { color: var(--muted); font-size: .68rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin-right: .45rem; }
+  /* stage tracker */
+  .stages { display: flex; align-items: flex-start; margin-bottom: 1.25rem; }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: .45rem; flex: 0 0 auto; width: 78px; }
+  .stage .dot {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    font-size: .9rem; font-weight: 700; border: 2px solid var(--border);
+    background: var(--panel); color: var(--muted); transition: all .3s;
+  }
+  .stage .name { font-size: .78rem; color: var(--muted); text-align: center; transition: color .3s; }
+  .stage.active .dot { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); animation: pulse 1.4s ease-in-out infinite; }
+  .stage.active .name { color: var(--text); font-weight: 700; }
+  .stage.done .dot { border-color: var(--ok); background: var(--ok); color: #fff; box-shadow: none; animation: none; }
+  .stage.done .name { color: var(--text); }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); } 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 8%, transparent); } }
+  .connector { flex: 1 1 auto; height: 3px; background: var(--border); border-radius: 3px; margin: 17px .25rem 0; transition: background .4s; }
+  .connector.done { background: var(--ok); }
+  /* per-question status rows */
+  .counter { font-size: .85rem; color: var(--muted); margin-bottom: .75rem; }
+  .counter b { color: var(--text); }
+  .qlist { list-style: none; margin: 0 0 1.1rem; padding: 0; display: grid; gap: .45rem; }
+  .qrow {
+    display: flex; align-items: center; gap: .65rem; padding: .55rem .7rem;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+    transition: border-color .3s;
+  }
+  .qrow .qi {
+    flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; display: grid;
+    place-items: center; font-size: .72rem; font-weight: 700;
+    background: var(--border); color: var(--text);
+  }
+  .qrow .qtext { flex: 1; font-size: .88rem; line-height: 1.4; }
+  .qrow .qstat {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: .35rem;
+    font-size: .72rem; font-weight: 700; letter-spacing: .02em;
+    padding: .18rem .55rem; border-radius: 20px; white-space: nowrap;
+  }
+  .qrow .qstat .sp {
+    width: 10px; height: 10px; border: 2px solid currentColor; border-top-color: transparent;
+    border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  #log {
+    font: .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    max-height: 220px; overflow-y: auto; margin: .6rem 0 0; padding: 0; list-style: none;
+  }
+  #log li { padding: .15rem 0; border-bottom: 1px dashed var(--border); }
+  #log .t { color: var(--muted); margin-right: .6rem; }
+  @media (prefers-reduced-motion: reduce) { .stage.active .dot, .spinner, .qstat .sp { animation: none; } }
+  /* mode toggle switch */
+  .mode-row { display: flex; gap: .85rem; align-items: center; margin-bottom: 1.1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  .switch { position: relative; width: 46px; height: 26px; flex: 0 0 auto; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch .slider { position: absolute; inset: 0; background: var(--border); border-radius: 26px; transition: background .25s; cursor: pointer; }
+  .switch .slider::before { content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .25s; }
+  .switch input:checked + .slider { background: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(20px); }
+  .switch input:focus-visible + .slider { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .mode-row .mode-name { font-weight: 700; }
+  /* extended thinking checkbox */
+  .check { display: flex; gap: .55rem; align-items: baseline; margin-top: .9rem; cursor: pointer; }
+  #chatWebWrap { margin-top: 0; margin-bottom: 1rem; padding-bottom: .9rem; border-bottom: 1px solid var(--border); }
+  .check input { width: auto; accent-color: var(--accent); transform: translateY(1px); }
+  .check b { font-weight: 600; }
+  .sources { margin-top: .9rem; margin-bottom: 1rem; font-size: .9rem; }
+  .sources summary { cursor: pointer; color: var(--muted); }
+  .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .4rem .9rem; margin-top: .6rem; }
+  .src { display: flex; gap: .45rem; align-items: center; cursor: pointer; }
+  .src input { width: auto; accent-color: var(--accent); }
+  /* chat mode */
+  #chatlog { display: flex; flex-direction: column; gap: .6rem; max-height: 440px; overflow-y: auto; margin-bottom: 1rem; }
+  #chatlog .empty { color: var(--muted); text-align: center; padding: 1.2rem 0; font-size: .9rem; }
+  .bubble { max-width: 85%; padding: .6rem .9rem; border-radius: 12px; font-size: .95rem; line-height: 1.5; overflow-wrap: break-word; }
+  .bubble.user { align-self: flex-end; background: var(--accent); color: var(--accent-text); border-bottom-right-radius: 4px; white-space: pre-wrap; }
+  .bubble.assistant { align-self: flex-start; background: var(--bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .bubble.assistant > :first-child { margin-top: 0; } .bubble.assistant > :last-child { margin-bottom: 0; }
+  .bubble.assistant code { background: var(--code-bg); border-radius: 4px; padding: .1em .35em; font-size: .9em; }
+  .bubble.assistant pre { background: var(--code-bg); border-radius: 8px; padding: .8rem 1rem; overflow-x: auto; }
+  .chat-form { display: flex; gap: .6rem; }
+  .chat-form input { flex: 1; }
+  .banner { border-radius: 8px; padding: .75rem 1rem; margin-bottom: 1rem; display: none; }
+  .banner.error { display: block; background: color-mix(in srgb, var(--err) 12%, transparent); color: var(--err); }
+  .banner.warn  { display: block; background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+  .report-tools { display: flex; gap: .6rem; justify-content: flex-end; margin-bottom: .75rem; }
+  .report-tools button { font-size: .85rem; padding: .35rem .8rem; font-weight: 500; }
+  #report h1, #report h2, #report h3 { line-height: 1.3; }
+  #report h1 { font-size: 1.45rem; } #report h2 { font-size: 1.2rem; } #report h3 { font-size: 1.05rem; }
+  #report code { background: var(--code-bg); border-radius: 4px; padding: .1em .35em; font-size: .9em; }
+  #report pre { background: var(--code-bg); border-radius: 8px; padding: .8rem 1rem; overflow-x: auto; }
+  #report pre code { background: none; padding: 0; }
+  #report blockquote { border-left: 3px solid var(--border); margin-left: 0; padding-left: 1rem; color: var(--muted); }
+  #report a, .bubble.assistant a { color: var(--accent); }
+  #report a.cite, .bubble.assistant a.cite { font-size: .78em; vertical-align: super; text-decoration: none; font-weight: 600; }
+  #report a.cite:hover, .bubble.assistant a.cite:hover { text-decoration: underline; }
+  .hidden { display: none; }
+  footer { color: var(--muted); font-size: .85rem; text-align: center; margin-top: 2rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🐋 Orcastrator</h1>
+    <p>Enter a topic and four local AI agents — Planner, Researcher, Critic and Writer — will produce a structured research report. Runs entirely on your machine via Ollama, LM Studio, or Jan.ai.</p>
+  </header>
+
+  <div id="banner" class="banner" role="alert"></div>
+
+  <form id="form" class="panel">
+    <div class="mode-row">
+      <label class="switch" for="modeToggle" aria-label="Research mode">
+        <input type="checkbox" id="modeToggle" checked>
+        <span class="slider"></span>
+      </label>
+      <div>
+        <div class="mode-name">Research mode</div>
+        <div class="hint" id="modeHint"></div>
+      </div>
+    </div>
+
+    <div id="topicWrap">
+      <label for="topic">Research topic</label>
+      <input id="topic" name="topic" placeholder="e.g. The history of the Roman aqueducts" autofocus>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="backend">Server</label>
+        <select id="backend">
+          <option value="ollama" selected>Ollama</option>
+          <option value="lmstudio">LM Studio</option>
+          <option value="jan">Jan.ai</option>
+        </select>
+      </div>
+      <div>
+        <label for="model">Model <span class="hint" id="modelHint">(installed in Ollama)</span></label>
+        <select id="model"></select>
+      </div>
+    </div>
+
+    <label class="check" id="extendedWrap">
+      <input type="checkbox" id="extended">
+      <span><b>Extended thinking</b> <span class="hint">— deeper 5-stage pipeline: challenge &amp; rebuttal per question, then draft → review → rewrite (~5–10 min instead of ~1–2)</span></span>
+    </label>
+
+    <label class="check" id="webWrap">
+      <input type="checkbox" id="webResearch" checked>
+      <span><b>Web research</b> <span class="hint">— ground every fact in web sources (Wikipedia, scholarly papers, encyclopedias) with verified reference links</span></span>
+    </label>
+
+    <details class="sources" id="sourcesWrap">
+      <summary>Research sources</summary>
+      <div class="sources-grid">
+        <label class="src"><input type="checkbox" data-engine="wikipedia" checked> Wikipedia</label>
+        <label class="src"><input type="checkbox" data-engine="openalex" checked> OpenAlex</label>
+        <label class="src"><input type="checkbox" data-engine="instant"> DDG Instant</label>
+        <label class="src"><input type="checkbox" data-engine="ddg" checked> DuckDuckGo web</label>
+        <label class="src"><input type="checkbox" data-engine="stock" checked> Stock quotes</label>
+        <label class="src"><input type="checkbox" data-engine="arxiv" checked> arXiv</label>
+        <label class="src"><input type="checkbox" data-engine="s2" checked> Semantic Scholar</label>
+        <label class="src"><input type="checkbox" data-engine="stackex" checked> Stack Exchange</label>
+        <label class="src"><input type="checkbox" data-engine="hn" checked> Hacker News</label>
+      </div>
+    </details>
+
+    <label class="check" id="citeWrap">
+      <input type="checkbox" id="citations" checked>
+      <span><b>Inline citations</b> <span class="hint">— clickable [n] links after each claim (uncheck for clean text; References stay)</span></span>
+    </label>
+
+    <details>
+      <summary>Advanced settings</summary>
+      <div class="row">
+        <div>
+          <label for="host">Server URL <span class="hint">(blank = default)</span></label>
+          <input id="host" placeholder="http://localhost:11434">
+        </div>
+        <div>
+          <label for="timeout">Timeout (s)</label>
+          <input id="timeout" type="number" min="10" step="10" value="300">
+        </div>
+        <div>
+          <label for="retries">Retries</label>
+          <input id="retries" type="number" min="0" max="5" value="1">
+        </div>
+      </div>
+    </details>
+
+    <div class="actions" id="actions">
+      <button type="submit" class="primary" id="go">Generate report</button>
+      <button type="button" id="stop" class="hidden">Stop</button>
+      <span id="status"></span>
+    </div>
+  </form>
+
+  <div id="chatPanel" class="panel hidden">
+    <label class="check" id="chatWebWrap">
+      <input type="checkbox" id="chatWebResearch" checked>
+      <span><b>Search the web</b> <span class="hint">— ground the reply in live sources with clickable citations (replies arrive after the search completes instead of streaming live)</span></span>
+    </label>
+
+    <details class="sources" id="chatSourcesWrap">
+      <summary>Search sources</summary>
+      <div class="sources-grid">
+        <label class="src"><input type="checkbox" data-engine="wikipedia" checked> Wikipedia</label>
+        <label class="src"><input type="checkbox" data-engine="openalex" checked> OpenAlex</label>
+        <label class="src"><input type="checkbox" data-engine="instant" checked> DDG Instant</label>
+        <label class="src"><input type="checkbox" data-engine="ddg" checked> DuckDuckGo web</label>
+        <label class="src"><input type="checkbox" data-engine="stock" checked> Stock quotes</label>
+        <label class="src"><input type="checkbox" data-engine="arxiv" checked> arXiv</label>
+        <label class="src"><input type="checkbox" data-engine="s2" checked> Semantic Scholar</label>
+        <label class="src"><input type="checkbox" data-engine="stackex" checked> Stack Exchange</label>
+        <label class="src"><input type="checkbox" data-engine="hn" checked> Hacker News</label>
+      </div>
+    </details>
+
+    <div id="chatlog"><div class="empty">Ask the model anything — replies stream in as they generate.</div></div>
+    <div class="chat-form">
+      <input id="chatInput" placeholder="Send a message…" autocomplete="off">
+      <button type="button" class="primary" id="chatSend">Send</button>
+    </div>
+  </div>
+
+  <div id="progressPanel" class="panel hidden">
+    <div class="progress-head">
+      <h2>Pipeline progress</h2>
+      <div class="timer"><span class="lbl">Elapsed</span><span id="timer">00:00</span></div>
+    </div>
+    <div id="stages" class="stages" aria-label="Pipeline stages"></div>
+    <div id="counter" class="counter hidden"></div>
+    <ul id="qlist" class="qlist"></ul>
+    <details id="logWrap">
+      <summary>Activity log</summary>
+      <ul id="log"></ul>
+    </details>
+  </div>
+
+  <div id="reportPanel" class="panel hidden">
+    <div class="report-tools">
+      <button type="button" id="copy">Copy Markdown</button>
+      <button type="button" id="download">Download .md</button>
+      <button type="button" id="downloadHtml">Download HTML</button>
+      <button type="button" id="printPdf">Print / PDF</button>
+    </div>
+    <div id="report"></div>
+  </div>
+
+  <footer>A run typically takes a few minutes — progress appears above as each agent finishes.</footer>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  let source = null;
+  let rawReport = "";
+
+  // --- tiny markdown renderer (headings, lists, bold/italic/code, fences) ---
+  const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  function inline(s) {
+    return s
+      .replace(/`([^`]+)`/g, (_, c) => "<code>" + c + "</code>")
+      // [[n]](https://…) inline citation links produced by the pipeline.
+      .replace(/\[\[(\d+)\]\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a class="cite" href="$2" target="_blank" rel="noopener noreferrer">[$1]</a>')
+      // [Title](https://…) links, e.g. the report's References section.
+      // Input is already HTML-escaped, so & appears as &amp; — valid in href.
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  }
+  function renderMarkdown(md) {
+    const out = [];
+    const lines = md.split("\n");
+    let list = null, para = [], fence = null;
+    const flushPara = () => { if (para.length) { out.push("<p>" + inline(para.join(" ")) + "</p>"); para = []; } };
+    const flushList = () => { if (list) { out.push("</" + list + ">"); list = null; } };
+    for (const raw of lines) {
+      const line = escapeHtml(raw);
+      if (fence !== null) {
+        if (/^```/.test(raw)) { out.push("<pre><code>" + fence.join("\n") + "</code></pre>"); fence = null; }
+        else fence.push(line);
+        continue;
+      }
+      if (/^```/.test(raw)) { flushPara(); flushList(); fence = []; continue; }
+      const h = line.match(/^(#{1,6})\s+(.*)/);
+      if (h) { flushPara(); flushList(); out.push(`<h${h[1].length}>` + inline(h[2]) + `</h${h[1].length}>`); continue; }
+      const ul = line.match(/^\s*[-*]\s+(.*)/);
+      const ol = line.match(/^\s*\d+[.)]\s+(.*)/);
+      if (ul || ol) {
+        flushPara();
+        const want = ul ? "ul" : "ol";
+        if (list !== want) { flushList(); out.push("<" + want + ">"); list = want; }
+        out.push("<li>" + inline((ul || ol)[1]) + "</li>");
+        continue;
+      }
+      if (line.startsWith("&gt;")) { flushPara(); flushList(); out.push("<blockquote><p>" + inline(line.slice(4).trim()) + "</p></blockquote>"); continue; }
+      if (!line.trim()) { flushPara(); flushList(); continue; }
+      para.push(line);
+    }
+    flushPara(); flushList();
+    if (fence !== null) out.push("<pre><code>" + fence.join("\n") + "</code></pre>");
+    return out.join("\n");
+  }
+
+  // --- UI helpers ---
+  function banner(kind, message) {
+    const el = $("banner");
+    el.className = "banner" + (kind ? " " + kind : "");
+    el.textContent = message || "";
+  }
+  function addLog(message) {
+    const li = document.createElement("li");
+    const t = document.createElement("span");
+    t.className = "t";
+    t.textContent = new Date().toLocaleTimeString();
+    li.appendChild(t);
+    li.appendChild(document.createTextNode(message));
+    $("log").appendChild(li);
+    $("log").scrollTop = $("log").scrollHeight;
+  }
+  function setRunning(running) {
+    $("go").disabled = running;
+    $("topic").disabled = running;
+    $("model").disabled = running;
+    $("backend").disabled = running;
+    $("extended").disabled = running;
+    $("webResearch").disabled = running;
+    $("citations").disabled = running;
+    $("modeToggle").disabled = running;
+    $("stop").classList.toggle("hidden", !running);
+    const eta = $("extended").checked ? "extended thinking can take 5–10 minutes" : "usually a minute or two";
+    $("status").innerHTML = running ? '<span class="spinner"></span>Working — ' + eta : "";
+  }
+
+  // --- elapsed timer ---
+  let timerStart = 0, timerInt = null;
+  function fmt(secs) {
+    const m = Math.floor(secs / 60), s = secs % 60;
+    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  }
+  function startTimer() {
+    timerStart = Date.now();
+    $("timer").textContent = "00:00";
+    clearInterval(timerInt);
+    timerInt = setInterval(() => {
+      $("timer").textContent = fmt(Math.floor((Date.now() - timerStart) / 1000));
+    }, 1000);
+  }
+  function stopTimer() {
+    clearInterval(timerInt);
+    if (timerStart) $("timer").textContent = fmt(Math.floor((Date.now() - timerStart) / 1000));
+  }
+
+  // --- stage tracker (3 stages normally, 5 with extended thinking) ---
+  // The backend announces the run's stage list on the planning event; this
+  // default only covers the moment before that event arrives.
+  const DEFAULT_STAGES = [
+    { key: "planning", label: "Plan" },
+    { key: "researching", label: "Research" },
+    { key: "writing", label: "Write" },
+  ];
+  let STAGE_ORDER = DEFAULT_STAGES.map((s) => s.key);
+  function buildStages(stages) {
+    const list = stages || DEFAULT_STAGES;
+    STAGE_ORDER = list.map((s) => s.key);
+    const host = $("stages");
+    host.innerHTML = "";
+    list.forEach((s, i) => {
+      if (i > 0) {
+        const c = document.createElement("div");
+        c.className = "connector"; c.dataset.conn = i;
+        host.appendChild(c);
+      }
+      const el = document.createElement("div");
+      el.className = "stage"; el.dataset.stage = s.key;
+      el.innerHTML = `<div class="dot">${i + 1}</div><div class="name"></div>`;
+      el.querySelector(".name").textContent = s.label;
+      host.appendChild(el);
+    });
+  }
+  function setStage(key) {
+    const idx = key === "done" ? STAGE_ORDER.length : STAGE_ORDER.indexOf(key);
+    STAGE_ORDER.forEach((k, i) => {
+      const el = $("stages").querySelector(`[data-stage="${k}"]`);
+      el.classList.toggle("done", i < idx);
+      el.classList.toggle("active", i === idx);
+      el.querySelector(".dot").textContent = i < idx ? "✓" : i + 1;
+    });
+    $("stages").querySelectorAll(".connector").forEach((c) => {
+      c.classList.toggle("done", Number(c.dataset.conn) <= idx);
+    });
+  }
+
+  // --- per-question status rows ---
+  const STATUS = {
+    searching:   { label: "Searching",   color: "var(--accent)", spin: true },
+    researching: { label: "Researching", color: "var(--accent)", spin: true },
+    challenging: { label: "Challenging", color: "var(--warn)",   spin: true },
+    rebutting:   { label: "Rebutting",   color: "var(--accent)", spin: true },
+    reviewing:   { label: "Reviewing",   color: "var(--warn)",   spin: true },
+    revising:    { label: "Revising",    color: "var(--warn)",   spin: true },
+    approved:    { label: "Approved",    color: "var(--ok)" },
+    done:        { label: "Done",        color: "var(--ok)" },
+    restored:    { label: "Restored",    color: "var(--ok)" },
+    unverified:  { label: "Unverified",  color: "var(--warn)" },
+  };
+  const TERMINAL = new Set(["approved", "done", "restored", "unverified"]);
+  let qTotal = 0;
+  function buildQuestions(questions) {
+    qTotal = questions.length;
+    const host = $("qlist");
+    host.innerHTML = "";
+    questions.forEach((q, i) => {
+      const li = document.createElement("li");
+      li.className = "qrow"; li.dataset.q = i;
+      li.innerHTML = `<span class="qi">${i + 1}</span>` +
+        `<span class="qtext"></span>` +
+        `<span class="qstat"></span>`;
+      li.querySelector(".qtext").textContent = q;
+      const stat = li.querySelector(".qstat");
+      stat.textContent = "Queued";
+      stat.style.color = "var(--muted)";
+      stat.style.background = "color-mix(in srgb, var(--muted) 12%, transparent)";
+      host.appendChild(li);
+    });
+    updateCounter();
+  }
+  function setQuestionStatus(index, status) {
+    const row = $("qlist").querySelector(`[data-q="${index}"]`);
+    if (!row) return;
+    const meta = STATUS[status] || { label: status, color: "var(--muted)" };
+    const stat = row.querySelector(".qstat");
+    stat.style.color = meta.color;
+    stat.style.background = `color-mix(in srgb, ${meta.color} 14%, transparent)`;
+    stat.innerHTML = (meta.spin ? '<span class="sp"></span>' : "") + meta.label;
+    row.style.borderColor = TERMINAL.has(status) ? `color-mix(in srgb, ${meta.color} 45%, var(--border))` : "var(--border)";
+    updateCounter();
+  }
+  function updateCounter() {
+    if (!qTotal) { $("counter").classList.add("hidden"); return; }
+    const done = $("qlist").querySelectorAll(".qstat").length
+      ? [...$("qlist").querySelectorAll(".qrow")].filter((r) => {
+          const t = r.querySelector(".qstat").textContent.toLowerCase();
+          return t === "approved" || t === "done" || t === "restored" || t === "unverified";
+        }).length
+      : 0;
+    $("counter").classList.remove("hidden");
+    $("counter").innerHTML = `Questions completed: <b>${done} / ${qTotal}</b>`;
+  }
+
+  function resetDashboard() {
+    buildStages();
+    $("qlist").innerHTML = "";
+    $("counter").classList.add("hidden");
+    $("log").innerHTML = "";
+    qTotal = 0;
+  }
+
+  function handleProgress(data) {
+    // Structured events are objects; tolerate a bare string as a plain log line.
+    if (typeof data === "string") { addLog(data); return; }
+    if (data.message) addLog(data.message);
+    if (data.kind === "stage") {
+      if (Array.isArray(data.stages)) buildStages(data.stages);
+      setStage(data.stage);
+      if (data.stage === "researching" && Array.isArray(data.questions)) buildQuestions(data.questions);
+    } else if (data.kind === "question") {
+      setQuestionStatus(data.index, data.status);
+    }
+  }
+
+  function stop() {
+    if (source) { source.close(); source = null; }
+    stopTimer();
+    setRunning(false);
+  }
+
+  // --- server + model pickers ---
+  const BACKENDS = {
+    ollama:   { label: "Ollama",    defaultHost: "http://localhost:11434", fallbackModel: "llama3.2" },
+    lmstudio: { label: "LM Studio", defaultHost: "http://localhost:1234",  fallbackModel: null },
+    jan:      { label: "Jan.ai",    defaultHost: "http://localhost:1337",  fallbackModel: null },
+  };
+  const backendInfo = () => BACKENDS[$("backend").value] || BACKENDS.ollama;
+
+  // Guards against out-of-order responses: switching Server/URL fires a new
+  // loadModels() call before an earlier (slower) one has resolved. Without
+  // this, a stale response landing last could overwrite a correct model list
+  // with an empty/wrong one — the model dropdown appearing to "lose" models.
+  let modelsRequestToken = 0;
+
+  async function loadModels() {
+    const select = $("model");
+    const info = backendInfo();
+    const token = ++modelsRequestToken;
+    $("modelHint").textContent = `(installed in ${info.label})`;
+    $("host").placeholder = info.defaultHost;
+    // Note: the select is intentionally left untouched until we have a
+    // definitive result below — clearing it up front would flash it empty
+    // (and, on a transient failure, leave it that way) even though the
+    // previously-loaded model list is still perfectly valid.
+    const buildFallback = (frag) => {
+      const opt = document.createElement("option");
+      if (info.fallbackModel) {
+        opt.value = info.fallbackModel; opt.textContent = info.fallbackModel + " (default)";
+      } else {
+        opt.value = ""; opt.textContent = "no models found";
+      }
+      frag.appendChild(opt);
+    };
+    try {
+      const params = new URLSearchParams({ backend: $("backend").value });
+      if ($("host").value.trim()) params.set("host", $("host").value.trim());
+      const res = await fetch("/api/models?" + params);
+      const data = await res.json();
+      if (token !== modelsRequestToken) return; // superseded by a newer request
+      const frag = document.createDocumentFragment();
+      for (const name of data.models) {
+        const opt = document.createElement("option");
+        opt.value = name; opt.textContent = name;
+        if (info.fallbackModel && name.startsWith(info.fallbackModel)) opt.selected = true;
+        frag.appendChild(opt);
+      }
+      if ((data.cloud_models || []).length) {
+        const group = document.createElement("optgroup");
+        group.label = "Ollama Cloud — needs `ollama signin`";
+        for (const name of data.cloud_models) {
+          const opt = document.createElement("option");
+          opt.value = name; opt.textContent = name + " ☁";
+          group.appendChild(opt);
+        }
+        frag.appendChild(group);
+      }
+      if (!data.models.length) buildFallback(frag);
+      banner("", ""); // clear any earlier warning now that we have a real result
+      select.innerHTML = "";
+      select.appendChild(frag);
+      if (data.error) banner("warn", data.error + ` — start ${info.label}, then reload this page.`);
+    } catch {
+      if (token !== modelsRequestToken) return; // superseded by a newer request
+      // A single failed request keeps whatever was already in the dropdown
+      // (stale-but-useful beats empty) unless it has never loaded anything.
+      if (!select.options.length) {
+        const frag = document.createDocumentFragment();
+        buildFallback(frag);
+        select.appendChild(frag);
+      }
+      banner("warn", "Could not query models — is the web server running?");
+    }
+  }
+  $("host").addEventListener("change", loadModels);
+  $("backend").addEventListener("change", () => { $("host").value = ""; loadModels(); });
+  loadModels();
+
+  // --- research/chat mode toggle ---
+  function applyMode() {
+    const research = $("modeToggle").checked;
+    $("modeHint").textContent = research
+      ? "On — four agents produce a structured research report (STORM pipeline)."
+      : "Off — chat directly with the selected model, no research pipeline.";
+    $("topicWrap").classList.toggle("hidden", !research);
+    $("extendedWrap").classList.toggle("hidden", !research);
+    $("webWrap").classList.toggle("hidden", !research);
+    $("citeWrap").classList.toggle("hidden", !research || !$("webResearch").checked);
+    $("sourcesWrap").classList.toggle("hidden", !research || !$("webResearch").checked);
+    $("actions").classList.toggle("hidden", !research);
+    $("chatPanel").classList.toggle("hidden", research);
+    $("progressPanel").classList.add("hidden");
+    $("reportPanel").classList.add("hidden");
+    if (research) {
+      $("topic").focus();
+    } else {
+      stop();
+      // Web search (and searching every source) defaults on whenever entering chat mode.
+      $("chatWebResearch").checked = true;
+      $("chatSourcesWrap").querySelectorAll('input[type="checkbox"]').forEach((c) => { c.checked = true; });
+      $("chatSourcesWrap").classList.remove("hidden");
+      $("chatInput").focus();
+    }
+  }
+  $("modeToggle").addEventListener("change", applyMode);
+  $("webResearch").addEventListener("change", () => {
+    $("citeWrap").classList.toggle("hidden", !$("modeToggle").checked || !$("webResearch").checked);
+    $("sourcesWrap").classList.toggle("hidden", !$("modeToggle").checked || !$("webResearch").checked);
+  });
+  $("chatWebResearch").addEventListener("change", () => {
+    $("chatSourcesWrap").classList.toggle("hidden", !$("chatWebResearch").checked);
+  });
+  applyMode();
+
+  // --- chat mode ---
+  const chatMessages = [];
+  let chatBusy = false;
+  // Reasoning models over OpenAI-compatible APIs emit <think>…</think> blocks
+  // inline. Hide finished blocks and any still-streaming unclosed one.
+  function stripThink(s) {
+    return s
+      .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\s*/gi, "")
+      .replace(/<think(?:ing)?>[\s\S]*$/i, "");
+  }
+  function addBubble(role, text) {
+    const empty = $("chatlog").querySelector(".empty");
+    if (empty) empty.remove();
+    const div = document.createElement("div");
+    div.className = "bubble " + role;
+    div.textContent = text;
+    $("chatlog").appendChild(div);
+    $("chatlog").scrollTop = $("chatlog").scrollHeight;
+    return div;
+  }
+  async function sendChat() {
+    const text = $("chatInput").value.trim();
+    if (!text || chatBusy) return;
+    chatBusy = true;
+    $("chatInput").value = "";
+    $("chatSend").disabled = true;
+    $("chatWebResearch").disabled = true;
+    banner("", "");
+    chatMessages.push({ role: "user", content: text });
+    addBubble("user", text);
+    const reply = addBubble("assistant", "…");
+    const chatSources = $("chatWebResearch").checked
+      ? [...document.querySelectorAll("#chatSourcesWrap input:checked")].map((c) => c.dataset.engine)
+      : [];
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: chatMessages,
+          model: $("model").value,
+          backend: $("backend").value,
+          host: $("host").value.trim() || null,
+          timeout: Number($("timeout").value) || 300,
+          use_web: $("chatWebResearch").checked,
+          sources: chatSources.join(","),
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let full = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        full += decoder.decode(value, { stream: true });
+        reply.textContent = stripThink(full) || "…";
+        $("chatlog").scrollTop = $("chatlog").scrollHeight;
+      }
+      full = stripThink(full);
+      reply.innerHTML = renderMarkdown(full);
+      chatMessages.push({ role: "assistant", content: full });
+    } catch (err) {
+      // A bare "Failed to fetch" means the request never got a response at all
+      // (server down/crashed, connection dropped) — say so plainly instead of
+      // echoing the browser's generic network-error text.
+      reply.textContent = err instanceof TypeError
+        ? "Error: could not reach the Orcastrator server — is it still running?"
+        : "Error: " + err.message;
+      chatMessages.pop(); // keep history consistent with what the model saw
+    } finally {
+      chatBusy = false;
+      $("chatSend").disabled = false;
+      $("chatWebResearch").disabled = false;
+      $("chatlog").scrollTop = $("chatlog").scrollHeight;
+      $("chatInput").focus();
+    }
+  }
+  $("chatSend").addEventListener("click", sendChat);
+  $("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); sendChat(); } });
+
+  // --- run pipeline over SSE ---
+  $("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const topic = $("topic").value.trim();
+    if (!topic) return;
+    banner("", "");
+    resetDashboard();
+    $("progressPanel").classList.remove("hidden");
+    $("reportPanel").classList.add("hidden");
+    setRunning(true);
+    startTimer();
+
+    const params = new URLSearchParams({
+      topic,
+      model: $("model").value,
+      backend: $("backend").value,
+      // Extended thinking maps to the deep 5-stage preset; default is the fast one.
+      preset: $("extended").checked ? "extended" : "fast",
+      use_web: $("webResearch").checked,
+      citations: $("citations").checked,
+      timeout: $("timeout").value || "300",
+      retries: $("retries").value || "1",
+    });
+    if ($("host").value.trim()) params.set("host", $("host").value.trim());
+    if ($("webResearch").checked) {
+      const srcs = [...document.querySelectorAll("#sourcesWrap input:checked")].map(c => c.dataset.engine);
+      if (srcs.length) params.set("sources", srcs.join(","));
+    }
+
+    source = new EventSource("/api/research?" + params);
+    source.addEventListener("progress", (ev) => handleProgress(JSON.parse(ev.data)));
+    source.addEventListener("report", (ev) => {
+      rawReport = JSON.parse(ev.data);
+      $("report").innerHTML = renderMarkdown(rawReport);
+      $("reportPanel").classList.remove("hidden");
+      setStage("done");
+      stopTimer();
+      addLog("Done in " + $("timer").textContent + " — report ready below.");
+      stop();
+      $("reportPanel").scrollIntoView({ behavior: "smooth" });
+    });
+    source.addEventListener("error", (ev) => {
+      if (ev.data) banner("error", "Pipeline failed: " + JSON.parse(ev.data));
+      else if (source) banner("error", "Lost connection to the server.");
+      stop();
+    });
+  });
+  $("stop").addEventListener("click", () => { addLog("Stopped by user."); stop(); });
+
+  // --- report tools ---
+  $("copy").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(rawReport);
+    $("copy").textContent = "Copied ✓";
+    setTimeout(() => ($("copy").textContent = "Copy Markdown"), 1500);
+  });
+  const reportFilename = () =>
+    $("topic").value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "report";
+
+  function downloadBlob(content, type, filename) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([content], { type }));
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  $("download").addEventListener("click", () => {
+    downloadBlob(rawReport, "text/markdown", reportFilename() + ".md");
+  });
+
+  // Standalone HTML document built entirely client-side (no pandoc needed).
+  const EXPORT_CSS = `
+    body { margin: 0 auto; max-width: 760px; padding: 2.5rem 1.25rem 4rem;
+           font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1d21; }
+    h1 { font-size: 1.6rem; line-height: 1.3; } h2 { font-size: 1.25rem; } h3 { font-size: 1.05rem; }
+    code { background: #eef1f4; border-radius: 4px; padding: .1em .35em; font-size: .9em; }
+    pre { background: #eef1f4; border-radius: 8px; padding: .8rem 1rem; overflow-x: auto; }
+    pre code { background: none; padding: 0; }
+    blockquote { border-left: 3px solid #dde1e6; margin-left: 0; padding-left: 1rem; color: #5c6470; }
+    a { color: #2563eb; }
+    a.cite { font-size: .78em; vertical-align: super; text-decoration: none; font-weight: 600; }`;
+
+  function standaloneHtml() {
+    const title = escapeHtml($("topic").value.trim() || "Research report");
+    return "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>" + title +
+      "</title>\n<style>" + EXPORT_CSS + "</style>\n</head>\n<body>\n" +
+      renderMarkdown(rawReport) + "\n</body>\n</html>\n";
+  }
+
+  $("downloadHtml").addEventListener("click", () => {
+    downloadBlob(standaloneHtml(), "text/html", reportFilename() + ".html");
+  });
+
+  // Print via a hidden iframe (the browser's print dialog can save as PDF) —
+  // works everywhere with zero dependencies and no popup permission.
+  $("printPdf").addEventListener("click", () => {
+    const frame = document.createElement("iframe");
+    frame.style.position = "fixed";
+    frame.style.right = "100%";
+    document.body.appendChild(frame);
+    frame.srcdoc = standaloneHtml();
+    frame.onload = () => {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+      setTimeout(() => frame.remove(), 60000);
+    };
+  });
+})();
+</script>
+</body>
+</html>
