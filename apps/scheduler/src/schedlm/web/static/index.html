@@ -138,7 +138,8 @@
     </div>
     <p class="muted" style="margin:0.4rem 0 0">The local model fills in the task below. Check it, ask for changes here (“make it 8am instead”), then Save.</p>
   </div>
-  <p class="muted">Raw task file (YAML frontmatter + Markdown prompt body). Saving validates it the same way <code>sched add</code> does.</p>
+  <p class="muted">The box above edits <strong>everything below</strong>, but the textarea below <strong>is</strong> the whole task — YAML frontmatter + Markdown prompt body, exactly what the runner reads. You can (and should) edit it directly; Save writes it back verbatim after validating it the same way <code>sched add</code> does. Nothing you wrote is dropped or rewritten unless you change it.
+    <br>Frontmatter accepts <code>id</code>, <code>name</code>, <code>schedule</code>/<code>fire_at</code>, <code>enabled</code>, <code>model</code>, <code>tools</code>, <code>timeout_minutes</code>, <code>catchup</code>, <code>output</code>, <code>sources:</code> (URLs the run must fetch) and <code>checks:</code> (<code>require_sources</code>, <code>min_report_links</code>, <code>require_cited_sources</code>).</p>
   <div class="field-row" id="filename-row">
     <label>Filename</label>
     <input type="text" id="edit-filename" style="flex:1">
@@ -172,6 +173,12 @@ timeout_minutes: 10
 catchup: false
 output:
   keep: 30
+# sources:            # (optional) URLs the run MUST fetch; the run is
+#   - https://example.com/feed   # failed/partial unless all are fetched
+# checks:             # (optional) deterministic verification of the report
+#   require_sources: true
+#   min_report_links: 3
+#   require_cited_sources: true
 ---
 
 Describe what the executor should do. Cite sources with URLs for any
@@ -463,13 +470,9 @@ function openNewTask() {
   document.getElementById('edit-error').style.display = 'none';
   document.getElementById('describe').style.display = 'block';
   document.getElementById('describe-log').innerHTML = '';
-  describeDraft = null;
   document.getElementById('edit-panel').classList.add('open');
   document.getElementById('describe-text').focus();
 }
-
-// The task file the model wrote last; a follow-up message asks it to change that.
-let describeDraft = null;
 
 function describeBubble(cls, text) {
   const log = document.getElementById('describe-log');
@@ -495,14 +498,16 @@ async function describeTask() {
   btn.disabled = true;
   const wait = describeBubble('model', 'Thinking… (the local model can take a few seconds)');
   try {
+    // Always hand the model the text currently in the editor, so it edits
+    // what is written (keeping instructions the user didn't ask to change)
+    // instead of inventing a thinner task from the one-line description.
     const content = document.getElementById('edit-content').value;
-    const draft = describeDraft !== null && content.trim() ? content : null;
+    const draft = content.trim() ? content : null;
     const data = await api('/api/tasks/draft', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({text, draft}),
     });
-    describeDraft = data.content;
     document.getElementById('edit-content').value = data.content;
     const m = data.content.match(/^schedule:\s*['"]?([^'"\n]+)/m);
     const english = m ? cronToEnglish(m[1].trim()) : null;

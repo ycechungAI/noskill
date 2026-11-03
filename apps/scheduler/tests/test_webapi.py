@@ -35,7 +35,7 @@ def make_cfg(tmp_path: Path) -> Config:
 def client(tmp_path):
     cfg = make_cfg(tmp_path)
     (tmp_path / "tasks").mkdir()
-    app = webapi.create_app(cfg)
+    app = webapi.create_app(cfg, seed_starters=False)
     return TestClient(app)
 
 
@@ -233,7 +233,7 @@ def config_client(tmp_path, monkeypatch):
     (tmp_path / "tasks").mkdir()
     config_path = tmp_path / "config.yaml"
     config_path.write_text("ollama:\n  model: qwen3:8b\n")
-    app = webapi.create_app(make_cfg(tmp_path), config_path=config_path)
+    app = webapi.create_app(make_cfg(tmp_path), config_path=config_path, seed_starters=False)
     return TestClient(app), config_path
 
 
@@ -258,7 +258,7 @@ def test_models_when_ollama_down(tmp_path, monkeypatch):
 
     monkeypatch.setattr(webapi.ollama, "Client", Down)
     (tmp_path / "tasks").mkdir()
-    client = TestClient(webapi.create_app(make_cfg(tmp_path)))
+    client = TestClient(webapi.create_app(make_cfg(tmp_path), seed_starters=False))
 
     data = client.get("/api/models").json()
 

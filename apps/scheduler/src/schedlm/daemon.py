@@ -16,6 +16,7 @@ import ollama
 
 from schedlm import report as report_mod
 from schedlm import schedule as schedule_mod
+from schedlm import seed as seed_mod
 from schedlm import store as store_mod
 from schedlm import tasks as tasks_mod
 from schedlm.config import Config, ConfigWatcher
@@ -324,6 +325,14 @@ def execute_and_record(
         conn.commit()
 
 
+def ensure_starter_tasks(tasks_dir: Path) -> None:
+    """Copy the bundled starter tasks into an untouched tasks dir (once per
+    install). Existing installs and post-delete state are left alone."""
+    seeded = seed_mod.ensure_starter_tasks(tasks_dir)
+    if seeded:
+        logger.info("first run: seeded starter task(s) %s", seeded)
+
+
 def recover_crashed_runs(
     cfg: Config, tasks_dir: Path | None = None, db_path: Path | None = None
 ) -> None:
@@ -466,6 +475,7 @@ def run_once(
     real Ollama; cli.py passes True for real usage."""
     if ensure_ollama:
         ensure_ollama_running(cfg)
+    ensure_starter_tasks(tasks_dir or Path(cfg.paths.tasks))
     recover_crashed_runs(cfg, tasks_dir, db_path)
     tick(cfg, tasks_dir, db_path, executor)
 
@@ -483,6 +493,7 @@ def run_forever(
     watcher = ConfigWatcher(config_path, cfg) if config_path is not None else None
     if ensure_ollama:
         ensure_ollama_running(cfg)
+    ensure_starter_tasks(tasks_dir or Path(cfg.paths.tasks))
     startup_catchup(cfg, tasks_dir, db_path, executor)
     logger.info(
         "daemon started (tick_seconds=%s, default model=%s)",

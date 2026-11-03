@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -85,14 +86,58 @@ def _migrate(conn: sqlite3.Connection) -> None:
     )
 
 
+def _pid_alive(pid: int | None) -> bool:
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Exists but owned by another user: treat as alive.
+        return True
+    except OSError:
+        return False
+    return True
+
+
 def recover_running_state(conn: sqlite3.Connection) -> None:
-    """Mark any 'running' rows left from a previous process as 'error'."""
+    """Mark crashed-process leftovers as 'error', but NEVER a run owned by a
+    live pid.
+
+    This is called on many code paths (CLI, web API, daemon startup), so it
+    must be safe to run while another process's run is in flight: a live
+    running_pid means the task is genuinely running, not crashed.
+    """
     now = datetime.now(timezone.utc).isoformat()
-    conn.execute(
-        "UPDATE runs SET status='error', error=?, finished_at=? WHERE status='running'",
-        ("daemon terminated during run", now),
-    )
-    conn.execute("UPDATE task_state SET running_pid=NULL WHERE running_pid IS NOT NULL")
+    rows = conn.execute(
+        "SELECT id, running_pid FROM task_state WHERE running_pid IS NOT NULL"
+    ).fetchall()
+    live_ids = [r["id"] for r in rows if _pid_alive(r["running_pid"])]
+    stale_ids = [r["id"] for r in rows if not _pid_alive(r["running_pid"])]
+    if stale_ids:
+        placeholders = ",".join("?" for _ in stale_ids)
+        conn.execute(
+            f"UPDATE runs SET status='error', error=?, finished_at=? "
+            f"WHERE task_id IN ({placeholders}) AND status='running'",
+            ("daemon terminated during run", now, *stale_ids),
+        )
+        conn.execute(
+            f"UPDATE task_state SET running_pid=NULL WHERE id IN ({placeholders})",
+            tuple(stale_ids),
+        )
+    if live_ids:
+        placeholders = ",".join("?" for _ in live_ids)
+        conn.execute(
+            f"UPDATE runs SET status='error', error=?, finished_at=? "
+            f"WHERE status='running' AND task_id NOT IN ({placeholders})",
+            ("daemon terminated during run", now, *live_ids),
+        )
+    else:
+        conn.execute(
+            "UPDATE runs SET status='error', error=?, finished_at=? WHERE status='running'",
+            ("daemon terminated during run", now),
+        )
     conn.commit()
 
 

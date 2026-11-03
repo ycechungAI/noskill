@@ -29,6 +29,7 @@ from schedlm import config as config_mod
 from schedlm import daemon as daemon_mod
 from schedlm import models as models_mod
 from schedlm import schedule as schedule_mod
+from schedlm import seed as seed_mod
 from schedlm import store as store_mod
 from schedlm import tasks as tasks_mod
 from schedlm.agent import planner as planner_mod
@@ -173,18 +174,31 @@ def _task_summary(conn, task: tasks_mod.Task, number: int, tz, now: datetime) ->
     }
 
 
-def create_app(cfg: Config, config_path: Path | None = None) -> FastAPI:
+def create_app(
+    cfg: Config, config_path: Path | None = None, seed_starters: bool = True
+) -> FastAPI:
     """`config_path`, if given, is re-read when it changes and is where
-    PUT /api/models/default saves the new default model."""
+    PUT /api/models/default saves the new default model. `seed_starters`
+    (default on) writes the bundled starter tasks into an untouched tasks
+    dir on first run; tests pass False to pin an empty fixture."""
     app = FastAPI(title="sched web UI")
+    # First-run seeding: an untouched tasks dir gets the bundled starter
+    # tasks (soft-persistent, user-deletable). No-op afterwards.
+    if seed_starters:
+        seed_mod.ensure_starter_tasks(_tasks_dir(cfg))
     watcher = config_mod.ConfigWatcher(config_path, cfg) if config_path is not None else None
 
     def current() -> Config:
         return watcher.current() if watcher is not None else cfg
 
     @app.get("/", response_class=HTMLResponse)
-    def index() -> str:
-        return (STATIC_DIR / "index.html").read_text()
+    def index() -> HTMLResponse:
+        # no-store: the tasks UI is small and the embedded WKWebView must
+        # never show a stale page after an upgrade.
+        return HTMLResponse(
+            (STATIC_DIR / "index.html").read_text(),
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.get("/api/tasks")
     def list_tasks() -> dict:

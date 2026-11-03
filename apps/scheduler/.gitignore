@@ -1,5 +1,6 @@
 data/
 runs/
+tasks/.starters-seeded
 __pycache__/
 *.egg-info/
 *.pyc

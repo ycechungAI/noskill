@@ -16,3 +16,4 @@
 /noskill
 /noskill-tray
 *.exe
+/build/

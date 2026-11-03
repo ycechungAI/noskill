@@ -37,6 +37,20 @@ noskill is a planned runtime that gives **local models** (Ollama, LM Studio, lla
 
 > **Status: Phase 3 and in use on macOS.** The runtime, learning loop, skill optimisation, scheduler, anime-tracker, signed skill registry and an opt-in LoRA pipeline are built and tested on macOS against a real Ollama. Linux and Windows build and vet cleanly but haven't been run on real machines. No release, installer or website is published yet; the GitHub org, signing key and domain are decided last ([PACKAGING.md](docs/PACKAGING.md)). This repo also holds the spec, the design docs and the Phase 0 test harness (`spikes/`, Python).
 
+## Project layout and build
+
+The repo holds the Go runtime plus the two hosted projects as subprojects under `apps/`:
+
+| Folder | What it is | Built by |
+|---|---|---|
+| `apps/macos/` | The noskill macOS app (SwiftUI): starts and shows noskill, orcastrator and sched. | `apps/macos/build-app.sh` (runs the app's test suite first); DMG via `apps/macos/make-dmg.sh` |
+| `apps/orcastrator/` | The research reports (STORM) part of the noskill app. | its own `start.sh --setup` (venv) |
+| `apps/scheduler/` | The task scheduler part of the noskill app. | its own `_venv.sh` (venv) |
+
+From the repo root, `./build.sh` builds the Go agent binary (`build/noskill`) and then the macOS app via `apps/macos/build-app.sh` (`--skip-app-tests` skips the app's test suite).
+
+The retired working copies of the two hosted projects are kept as tombstones: `~/dev/scheduler/MOVED.md` and `~/dev/orcastrator/MOVED.md`.
+
 ## The noskill app (macOS prototype)
 One app that starts and runs noskill together with two sibling projects it hosts in this repo, **orcastrator** (long research reports, `apps/orcastrator/`) and **sched** (prompts on a cron schedule, `apps/scheduler/`; both moved into the repo on 2026-11-03, original folders `~/dev/orcastrator` and `~/dev/scheduler` retired), plus Ollama. Start All brings them all up, and one window shows each one's page with a menu-bar icon for status. Build it with `apps/macos/build-app.sh`. What it runs and how: [docs/APP.md](docs/APP.md).
 
@@ -76,6 +90,22 @@ Measured on a 16 GB Mac mini M4:
 - **Script sandbox** ([S9](docs/spikes/S9-results.md), macOS): a generated `sandbox-exec` profile blocked all 24 attacks (reading `~/.ssh`, escaping the workspace, direct network, DNS, fork bombs, …) with no admin rights, while Python and Node work ran through the egress proxy. It adds ~45 ms per call. Linux and Windows aren't tested yet.
 
 Phase 0 ended in a **conditional go** ([PHASE0_GO_NO_GO.md](docs/spikes/PHASE0_GO_NO_GO.md)). Progress is tracked in [ROADMAP.md](docs/ROADMAP.md).
+
+## Session notes (2026-11-03)
+
+- **Task verification** landed in the scheduler (`apps/scheduler/`): deterministic run checks
+  (`sources:`, `checks:`, `unbacked_report`, `min_report_links`, `no_web_data`), one bounded
+  retry, honest statuses `success | partial | failed`. Documented in
+  [docs/SESSION-2026-11-03-task-verification-and-monorepo.md](docs/SESSION-2026-11-03-task-verification-and-monorepo.md).
+- **Monorepo move**: scheduler and orcastrator now live in this repo as `apps/scheduler/` and
+  `apps/orcastrator/` (git subtree); old `~/dev/scheduler` and `~/dev/orcastrator` retired.
+- **App delete fix**: the Tasks tab's delete was dead inside the app because the embedded WKWebView
+  silently returns `false` for JS `confirm()`; replaced with a two-click button.
+- **"Error" badge while running**: the web API called crash-recovery on every request, flipping
+  in-flight runs to `error`. Recovery is now pid-aware, and the task list shows `running` for
+  in-flight tasks.
+- **Starter tasks**: fresh installs seed four ready-made tasks on first run (`starter_tasks/`),
+  soft-persistent — the user can delete them and they never come back.
 
 ## Docs
 Read them as a site: `go run ./scripts/docsite` writes `site/` (static HTML, no JavaScript; open `site/index.html`, or `docs-site` in `.claude/launch.json` serves it on :8767). It fails on a broken link, so the docs can't point at files that aren't there. Nothing is hosted yet. **Writing a skill? Start with [SKILL_AUTHORING.md](docs/SKILL_AUTHORING.md).**
