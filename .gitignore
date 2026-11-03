@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.DS_Store
+.claude/
+report.md
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.orcastrator_state.json
+.orcastrator_state.json.tmp
+.venv.*/
