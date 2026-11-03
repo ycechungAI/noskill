@@ -15,9 +15,10 @@ Needs macOS 14 or later and the Command Line Tools (no Xcode). Go puts the noski
 the app; without Go the app is built without it.
 
     apps/macos/test.sh                  # the tests (a few seconds)
+    ./build.sh                          # from the repo root: agent + app + DMG, one command
     apps/macos/build-app.sh             # tests, then apps/macos/build/noskill.app
     apps/macos/build-app.sh --install   # also copies it to /Applications (needs an admin)
-    apps/macos/make-dmg.sh              # build/noskill-<version>.dmg, checked: mounted, signature, starts
+    apps/macos/make-dmg.sh              # build/noskill-<version>.dmg + .sha256, checked: mounted, signature, starts
     open apps/macos/build/noskill.app
 
 `NOSKILL_APP_SKIP_TESTS=1` skips the tests in `build-app.sh`. The version is

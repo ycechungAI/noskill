@@ -3,7 +3,7 @@
 > Your local model starts with no skills. It learns them.
 
 ## Install
-No release is published yet, so for now you install from a clone (the repo is private, so `git` must be signed in to GitHub, e.g. `gh auth login`). The installer builds noskill, and first installs **Go**, **Ollama** and the recommended models (`granite4:3b`, `gemma3:1b`) if they are missing, asking before each download.
+There is a **v0.2.0 release** on GitHub (ad-hoc signed, not notarized — see [docs/APP.md](docs/APP.md#install-from-the-dmg) for first-open instructions). If you'd rather build from source, the clone installer builds noskill and first installs **Go**, **Ollama** and the recommended models (`granite4:3b`, `gemma3:1b`) if they are missing, asking before each download. The repo is private, so `git` must be signed in to GitHub, e.g. `gh auth login`.
 
 **macOS / Linux**
 ```bash
@@ -43,11 +43,13 @@ The repo holds the Go runtime plus the two hosted projects as subprojects under 
 
 | Folder | What it is | Built by |
 |---|---|---|
-| `apps/macos/` | The noskill macOS app (SwiftUI): starts and shows noskill, orcastrator and sched. | `apps/macos/build-app.sh` (runs the app's test suite first); DMG via `apps/macos/make-dmg.sh` |
+| `apps/macos/` | The noskill macOS app (SwiftUI): starts and shows noskill, orcastrator and sched. | `./build.sh` from the root (or `apps/macos/build-app.sh` alone; DMG via `apps/macos/make-dmg.sh`) |
 | `apps/orcastrator/` | The research reports (STORM) part of the noskill app. | its own `start.sh --setup` (venv) |
 | `apps/scheduler/` | The task scheduler part of the noskill app. | its own `_venv.sh` (venv) |
 
-From the repo root, `./build.sh` builds the Go agent binary (`build/noskill`) and then the macOS app via `apps/macos/build-app.sh` (`--skip-app-tests` skips the app's test suite).
+From the repo root, `./build.sh` runs the whole developer build: it deletes AppleDouble/.DS_Store junk and stale outputs, verifies the build dependencies (printing the exact install command if one is missing — it never installs system-wide software itself), builds the Go agent to `build/noskill`, then `apps/macos/make-dmg.sh` builds the app (running its test suite first) and the DMG `apps/macos/build/noskill-<version>.dmg` — mounted, signature-verified and started once as a check. Flags: `--no-dmg` (app only), `--skip-tests`, `--deps` (first-pull setup: checks deps and sets up the sched/orcastrator `.venv`s via their own self-healing scripts; needs network once), `--heal` (repo-local fix-ups only). A fresh `git clone` → `./build.sh` is the one-command path.
+
+Don't confuse it with `./start.sh` and `start.sh install`: those are the **user** path — running noskill from this source tree, or installing it to `~/.local/bin` (plus Go / Ollama / models when missing). `./build.sh` is the **developer** path — the app bundle and the release DMG; it installs nothing system-wide.
 
 The retired working copies of the two hosted projects are kept as tombstones: `~/dev/scheduler/MOVED.md` and `~/dev/orcastrator/MOVED.md`.
 

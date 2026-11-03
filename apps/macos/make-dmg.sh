@@ -24,6 +24,8 @@ ln -s /Applications "$STAGE/Applications"
 rm -f "$DMG"
 hdiutil create -quiet -volname "noskill $VER" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 echo "Built apps/macos/$DMG ($(du -h "$DMG" | cut -f1))"
+( cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256" )
+echo "Wrote $DMG.sha256"
 
 echo "Checking the DMG…"
 hdiutil verify -quiet "$DMG"

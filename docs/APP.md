@@ -15,7 +15,7 @@ The app is built in [apps/macos/](../apps/macos/README.md). Why it runs the thre
 are, rather than merging their code, is in [ADR-0017](adr/0017-noskill-app-runs-three-projects.md).
 
 ## Install from the DMG
-`apps/macos/make-dmg.sh` makes `apps/macos/build/noskill-<version>.dmg`. Open it and drag
+`./build.sh` from the repository root makes `apps/macos/build/noskill-<version>.dmg` (it builds the app and the Go agent inside it, packages and mounts the DMG, verifies the signatures and starts it once as a check; `apps/macos/make-dmg.sh` is the same DMG step alone). A `<version>.dmg.sha256` checksum is written next to it — verify before opening: `shasum -a 256 -c noskill-<version>.dmg.sha256`. Open the DMG and drag
 **noskill** to **Applications**. Dragging to `/Applications` needs an administrator; without one,
 copy it to `~/Applications` instead (make that folder if it isn't there). Both work the same.
 
@@ -131,6 +131,10 @@ the next launch shows those parts as started outside the app, and you stop them 
 ## Checking it
 - `apps/macos/test.sh`: the unit tests (detection, the fixes and their scripts, models, panes;
   well under a minute). `build-app.sh` runs them first and won't build when one fails.
+- `./build.sh` (repo root): the whole build — heals AppleDouble/.DS_Store junk, checks the
+  dependencies (never installs system-wide software on its own), builds the Go agent, the app
+  and the DMG, writing `apps/macos/build/noskill-<version>.dmg(.sha256)`. `--deps` does the
+  first-pull setup of the sched/orcastrator `.venv`s; `--heal` only fixes the junk.
 - `apps/macos/make-dmg.sh`: builds, packages, mounts the DMG, verifies the signatures and starts
   the app from it with `--self-test` (prints what Setup would show and checks the agent inside
   runs; changes nothing).
