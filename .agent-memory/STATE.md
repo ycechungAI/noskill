@@ -143,3 +143,13 @@ _Last updated: 2026-10-24 by Claude Code_
   uv/venv build, repair, bundled-agent install (scripts are tested; repair tested on a scratch folder).
 - The user's app.json is at the session scratchpad as app.json.before-fresh-test; the app writes a new one
   when Setup finishes.
+
+## Update 2026-11-03 (v0.2.0 published)
+
+- `feature/macos-app-setup` fast-forwarded to `main` and pushed; tag **v0.2.0** (annotated) pushed to
+  origin (ycechungAI/noskill) from 60f715e. `go vet ./...` and `go test ./...` green on darwin/arm64
+  before tagging (not the full six-target vet loop).
+- GitHub Release page created with hand-written notes (https://github.com/ycechungAI/noskill/releases/tag/v0.2.0);
+  `gh` was blocked by api.github.com timeouts until the user fixed the firewall. GoReleaser
+  (`goreleaser release`) would also publish it, but needs NOSKILL_UPDATE_PUBKEY set.
+- This was the repo's **first tag** — no v0.1.0 exists despite PACKAGING.md's v0.1/v0.2 channel matrix.
