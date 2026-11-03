@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sched-web-ui",
+      "runtimeExecutable": ".venv/bin/sched",
+      "runtimeArgs": ["serve"],
+      "port": 8787
+    }
+  ]
+}

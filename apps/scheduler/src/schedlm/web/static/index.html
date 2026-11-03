@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>sched</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 1080px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    line-height: 1.4;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h1 .sub { font-weight: normal; opacity: 0.6; font-size: 0.9rem; }
+  h2 { font-size: 1rem; margin: 1.5rem 0 0.6rem; }
+  #summary { opacity: 0.75; font-size: 0.9rem; margin-bottom: 1rem; }
+  #toolbar { margin-bottom: 1.25rem; }
+
+  button {
+    font: inherit; cursor: pointer; border: 1px solid rgba(128,128,128,0.4);
+    background: transparent; border-radius: 6px; padding: 0.3rem 0.7rem; margin: 0 0.15rem 0 0;
+  }
+  button.primary { background: #2a6adf; color: white; border-color: #2a6adf; }
+  button.danger { color: #b33; border-color: rgba(187,51,51,0.5); }
+  button:disabled { opacity: 0.5; cursor: default; }
+
+  .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.85rem; }
+  .task-card {
+    border: 1px solid rgba(128,128,128,0.25); border-radius: 10px;
+    padding: 0.9rem 1rem; background: rgba(128,128,128,0.05);
+    display: flex; flex-direction: column; gap: 0.5rem;
+  }
+  .task-card.disabled { opacity: 0.55; }
+  .task-card.invalid { border-color: rgba(187,51,51,0.5); background: rgba(187,51,51,0.06); }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+  .card-head .id { font-weight: 600; font-size: 1.02rem; word-break: break-word; }
+  .card-badges { display: flex; gap: 0.3rem; flex-shrink: 0; }
+
+  .badge {
+    font-size: 0.68rem; padding: 0.15rem 0.5rem; border-radius: 999px;
+    font-weight: 600; white-space: nowrap; line-height: 1.5;
+  }
+  .badge-num { background: rgba(128,128,128,0.18); }
+  .badge-on { background: rgba(42,122,42,0.15); color: #2a9d2a; }
+  .badge-off { background: rgba(128,128,128,0.18); opacity: 0.8; }
+  .badge-success { background: rgba(42,122,42,0.15); color: #2a9d2a; }
+  .badge-error, .badge-timeout { background: rgba(190,50,50,0.15); color: #d15050; }
+  .badge-running { background: rgba(210,150,0,0.18); color: #d19a00; }
+  .badge-skipped_overlap { background: rgba(128,128,128,0.18); }
+
+  .schedule-line { font-size: 0.9rem; }
+  .schedule-main { font-weight: 500; }
+  .schedule-raw { font-family: ui-monospace, Menlo, monospace; opacity: 0.5; font-size: 0.72rem; margin-left: 0.4rem; }
+
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.5rem; font-size: 0.82rem; }
+  .meta-grid .label { opacity: 0.55; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.02em; }
+  .meta-grid .rel { opacity: 0.55; font-size: 0.75rem; margin-left: 0.3rem; }
+  .invalid-reason { font-size: 0.85rem; color: #d15050; white-space: pre-wrap; }
+
+  .card-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.2rem; }
+
+  .panel {
+    border: 1px solid rgba(128,128,128,0.4); border-radius: 8px; padding: 1rem;
+    margin-bottom: 1.5rem; display: none;
+  }
+  .panel.open { display: block; }
+  textarea {
+    width: 100%; min-height: 320px; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.85rem; box-sizing: border-box; padding: 0.5rem;
+  }
+  input[type=text] { font: inherit; padding: 0.3rem; box-sizing: border-box; }
+  .error-box {
+    background: rgba(200,50,50,0.12); border: 1px solid rgba(200,50,50,0.4);
+    border-radius: 4px; padding: 0.5rem; margin: 0.5rem 0; display: none; white-space: pre-wrap;
+  }
+  .log {
+    background: rgba(128,128,128,0.08); border-radius: 4px; padding: 0.5rem;
+    max-height: 260px; overflow-y: auto; font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.8rem; white-space: pre-wrap; margin: 0.5rem 0;
+  }
+  .report { white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+  .field-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+  .field-row label { min-width: 5rem; opacity: 0.7; font-size: 0.85rem; }
+  .muted { opacity: 0.6; font-size: 0.85rem; }
+
+  .describe { border: 1px solid rgba(128,128,128,0.3); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.9rem; }
+  .describe-log { display: flex; flex-direction: column; gap: 0.35rem; max-height: 180px; overflow-y: auto; margin-bottom: 0.5rem; }
+  .describe-log:empty { display: none; }
+  .bubble { padding: 0.35rem 0.6rem; border-radius: 8px; font-size: 0.88rem; white-space: pre-wrap; max-width: 85%; }
+  .bubble.you { align-self: flex-end; background: rgba(60,120,220,0.15); }
+  .bubble.model { align-self: flex-start; background: rgba(128,128,128,0.12); }
+  .bubble.error { align-self: flex-start; background: rgba(200,50,50,0.12); }
+  .describe-row { display: flex; gap: 0.5rem; align-items: flex-end; }
+  .describe-row textarea { min-height: 2.6rem; height: 2.6rem; flex: 1; font-family: inherit; font-size: 0.9rem; resize: vertical; }
+
+  .model-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem;
+    border: 1px solid rgba(128,128,128,0.25); border-radius: 10px;
+    padding: 0.55rem 0.8rem; margin-bottom: 1rem; font-size: 0.88rem;
+  }
+  .model-bar .label { opacity: 0.6; }
+  .model-bar .in-use { font-weight: 600; }
+  .model-bar .warn { color: #d19a00; }
+  .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; display: inline-block; background: #2a9d2a; }
+  .dot.down { background: #d15050; }
+  .dot.busy { background: #d19a00; }
+  select { font: inherit; padding: 0.15rem 0.3rem; border-radius: 6px; max-width: 100%; }
+  .model-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; }
+  .model-row select { flex: 1; min-width: 0; font-size: 0.82rem; }
+</style>
+</head>
+<body>
+<h1>sched <span class="sub">task manager</span></h1>
+<div id="model-bar" class="model-bar"><span class="muted">Checking Ollama…</span></div>
+<div id="summary"></div>
+
+<div id="toolbar">
+  <button class="primary" onclick="openNewTask()">+ New task</button>
+  <button onclick="refresh()">Refresh</button>
+</div>
+
+<div id="task-grid" class="task-grid"></div>
+<div id="invalid-section" style="display:none;">
+  <h2>⚠ Needs attention</h2>
+  <div id="invalid-grid" class="task-grid"></div>
+</div>
+
+<div id="edit-panel" class="panel">
+  <h3 id="edit-title">Edit task</h3>
+  <div class="describe" id="describe">
+    <div class="describe-log" id="describe-log"></div>
+    <div class="describe-row">
+      <textarea id="describe-text" placeholder="Say what to do and when, e.g. &quot;every weekday at 7am, summarise the top AI news with links&quot;" onkeydown="describeKey(event)"></textarea>
+      <button class="primary" id="describe-btn" onclick="describeTask()">Fill in</button>
+    </div>
+    <p class="muted" style="margin:0.4rem 0 0">The local model fills in the task below. Check it, ask for changes here (“make it 8am instead”), then Save.</p>
+  </div>
+  <p class="muted">Raw task file (YAML frontmatter + Markdown prompt body). Saving validates it the same way <code>sched add</code> does.</p>
+  <div class="field-row" id="filename-row">
+    <label>Filename</label>
+    <input type="text" id="edit-filename" style="flex:1">
+  </div>
+  <div class="error-box" id="edit-error"></div>
+  <textarea id="edit-content" spellcheck="false"></textarea>
+  <div style="margin-top: 0.5rem;">
+    <button class="primary" onclick="saveTask()">Save</button>
+    <button onclick="closeEdit()">Cancel</button>
+  </div>
+</div>
+
+<div id="run-panel" class="panel">
+  <h3 id="run-title">Run</h3>
+  <div class="log" id="run-log"></div>
+  <div id="run-report-wrap" style="display:none;">
+    <h4>Report</h4>
+    <div class="report" id="run-report"></div>
+  </div>
+  <button onclick="closeRun()">Close</button>
+</div>
+
+<script>
+const NEW_TASK_TEMPLATE = `---
+id: my-new-task
+name: My New Task
+schedule: "0 8 * * *"
+enabled: true
+tools: [web_search, fetch_page, current_datetime]
+timeout_minutes: 10
+catchup: false
+output:
+  keep: 30
+---
+
+Describe what the executor should do. Cite sources with URLs for any
+current-events, price, or news claim.
+`;
+
+const DOW_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function fmtTime(hourStr, minuteStr) {
+  const h = parseInt(hourStr, 10), m = parseInt(minuteStr, 10);
+  const period = h >= 12 ? 'PM' : 'AM';
+  let h12 = h % 12; if (h12 === 0) h12 = 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+function dowListToText(field) {
+  if (field.includes('-')) {
+    const [a, b] = field.split('-').map(Number);
+    return `${DOW_NAMES[a]}–${DOW_NAMES[b]}`;
+  }
+  if (field.includes(',')) {
+    return field.split(',').map(n => DOW_NAMES[Number(n)] || n).join(', ');
+  }
+  return DOW_NAMES[Number(field)] || field;
+}
+
+// Best-effort English summary of a 5-field cron string, for the common
+// fixed-minute/fixed-hour cases this project's tasks actually use. Anything
+// it doesn't recognize (steps, lists of months, etc.) falls back to null so
+// the caller just shows the raw cron string instead of a wrong summary.
+function cronToEnglish(cron) {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return null;
+  const [min, hour, dom, month, dow] = parts;
+  if (!/^\d+$/.test(min) || !/^\d+$/.test(hour) || month !== '*') return null;
+  const time = fmtTime(hour, min);
+  if (dom === '*' && dow === '*') return `Daily at ${time}`;
+  if (dom === '*' && dow !== '*') return `Weekly on ${dowListToText(dow)} at ${time}`;
+  if (dom !== '*' && dow === '*') return `Monthly on day ${dom} at ${time}`;
+  return null;
+}
+
+function scheduleHtml(cron) {
+  if (cron.startsWith('once@')) {
+    return `<span class="schedule-main">One-time run</span><span class="schedule-raw">${escapeHtml(cron.slice(5))}</span>`;
+  }
+  const english = cronToEnglish(cron);
+  return english
+    ? `<span class="schedule-main">${escapeHtml(english)}</span><span class="schedule-raw">${escapeHtml(cron)}</span>`
+    : `<span class="schedule-main">${escapeHtml(cron)}</span>`;
+}
+
+function parseServerDate(s) {
+  if (!s) return null;
+  if (s.startsWith('once@')) s = s.slice(5);
+  const iso = s.includes('T') ? s : s.replace(' ', 'T');
+  const d = new Date(iso);
+  return isNaN(d) ? null : d;
+}
+
+function relativeTime(s) {
+  const d = parseServerDate(s);
+  if (!d) return '';
+  const diffMs = d - new Date();
+  const mins = Math.round(Math.abs(diffMs) / 60000);
+  let text;
+  if (mins < 1) text = 'now';
+  else if (mins < 60) text = `${mins}m`;
+  else if (mins < 60 * 24) text = `${Math.round(mins / 60)}h`;
+  else text = `${Math.round(mins / 60 / 24)}d`;
+  return diffMs > 0 ? `in ${text}` : `${text} ago`;
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('application/json') ? res.json() : res.text();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderSummary(tasks) {
+  const box = document.getElementById('summary');
+  if (tasks.length === 0) { box.textContent = ''; return; }
+  const enabledCount = tasks.filter(t => t.enabled).length;
+  const upcoming = tasks
+    .filter(t => t.enabled && t.next_run)
+    .map(t => ({ t, d: parseServerDate(t.next_run) }))
+    .filter(x => x.d)
+    .sort((a, b) => a.d - b.d);
+  let text = `${tasks.length} task${tasks.length === 1 ? '' : 's'} · ${enabledCount} enabled`;
+  if (upcoming.length) {
+    text += ` · next up: ${upcoming[0].t.id} (${relativeTime(upcoming[0].t.next_run)})`;
+  }
+  box.textContent = text;
+}
+
+let models = null;  // last GET /api/models
+
+function modelLabel(m) {
+  return m.tools === false ? `${m.name} (no tool calling)` : m.name;
+}
+
+// <option>s for a model <select>: installed models, plus `selected` itself
+// if it isn't installed (so the select never silently shows something else).
+function modelOptions(selected, firstOption) {
+  const installed = models ? models.installed : [];
+  let html = firstOption || '';
+  if (selected && !installed.some(m => m.name === selected)) {
+    html += `<option value="${escapeHtml(selected)}" selected>${escapeHtml(selected)} (not installed)</option>`;
+  }
+  for (const m of installed) {
+    html += `<option value="${escapeHtml(m.name)}"${m.name === selected ? ' selected' : ''}>${escapeHtml(modelLabel(m))}</option>`;
+  }
+  return html;
+}
+
+// A run in progress records the model it was configured with; if that one
+// isn't installed the executor substitutes the same fallback the server
+// reports as effective_default, so show that instead.
+function inUseModel(name) {
+  if (!models || !models.ollama_up || !name) return name || (models && models.effective_default);
+  return models.installed.some(m => m.name === name) ? name : models.effective_default;
+}
+
+function renderModelBar(tasks) {
+  const bar = document.getElementById('model-bar');
+  if (!models) {
+    bar.innerHTML = '<span class="dot down"></span><span>Could not load model info.</span>';
+    return;
+  }
+  const running = tasks.filter(t => t.status === 'running');
+  let html = `<span class="dot ${!models.ollama_up ? 'down' : running.length ? 'busy' : ''}"></span>`;
+  if (running.length) {
+    html += `<span>Running <b>${running.map(t => escapeHtml(t.id)).join(', ')}</b> on ` +
+      `<span class="in-use">${escapeHtml(inUseModel(running[0].last_model))}</span></span>`;
+  } else {
+    html += `<span class="label">LLM in use:</span><span class="in-use">${escapeHtml(models.effective_default)}</span>`;
+  }
+  html += `<span class="label" style="margin-left:auto">Default model</span>`;
+  const disabled = models.ollama_up && models.can_change_default ? '' : ' disabled';
+  html += `<select id="default-model"${disabled}>${modelOptions(models.default)}</select>`;
+  if (!models.ollama_up) {
+    html += `<span class="warn" style="flex-basis:100%">Ollama isn't reachable at ${escapeHtml(models.host)}; sched starts it when a task runs.</span>`;
+  } else if (models.note) {
+    html += `<span class="warn" style="flex-basis:100%">${escapeHtml(models.note)}</span>`;
+  }
+  bar.innerHTML = html;
+  const select = document.getElementById('default-model');
+  select.onchange = () => setDefaultModel(select.value);
+}
+
+async function setDefaultModel(model) {
+  try {
+    await api('/api/models/default', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model}),
+    });
+  } catch (e) { alert('Could not switch model: ' + e.message); }
+  refresh();
+}
+
+async function setTaskModel(taskId, model) {
+  try {
+    await api(`/api/tasks/${encodeURIComponent(taskId)}/model`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model: model || null}),
+    });
+  } catch (e) { alert('Could not set model: ' + e.message); }
+  refresh();
+}
+
+function renderTaskCard(t) {
+  const div = document.createElement('div');
+  div.className = 'task-card' + (t.enabled ? '' : ' disabled');
+  const statusBadge = t.status ? `<span class="badge badge-${t.status}">${t.status}</span>` : '';
+  div.innerHTML = `
+    <div class="card-head">
+      <div class="id">${escapeHtml(t.id)}</div>
+      <div class="card-badges">
+        <span class="badge badge-num">#${t.number}</span>
+        <span class="badge ${t.enabled ? 'badge-on' : 'badge-off'}">${t.enabled ? 'enabled' : 'disabled'}</span>
+      </div>
+    </div>
+    <div class="schedule-line">${scheduleHtml(t.schedule)}</div>
+    <div class="meta-grid">
+      <div>
+        <div class="label">Last run</div>
+        ${t.last_run ? `${statusBadge}<span class="rel">${relativeTime(t.last_run)}</span>` : '<span class="muted">never</span>'}
+        ${t.last_model ? `<div class="rel" style="margin-left:0">on ${escapeHtml(t.status === 'running' ? inUseModel(t.last_model) : t.last_model)}</div>` : ''}
+      </div>
+      <div>
+        <div class="label">Next run</div>
+        ${t.next_run ? `${escapeHtml(t.next_run)}<span class="rel">${relativeTime(t.next_run)}</span>` : '<span class="muted">—</span>'}
+      </div>
+      <div class="model-row">
+        <span class="label">Model</span>
+        <select class="task-model"${models && models.ollama_up ? '' : ' disabled'}>${modelOptions(
+          t.model,
+          `<option value=""${t.model ? '' : ' selected'}>Default (${escapeHtml(models ? models.effective_default : '…')})</option>`,
+        )}</select>
+      </div>
+    </div>
+    <div class="card-actions"></div>
+  `;
+  const modelSelect = div.querySelector('.task-model');
+  modelSelect.onchange = () => setTaskModel(t.id, modelSelect.value);
+  const actions = div.querySelector('.card-actions');
+  actions.appendChild(mkBtn('Edit', () => openEdit(t.filename)));
+  actions.appendChild(mkBtn('Run', () => runTask(t.id)));
+  actions.appendChild(mkBtn(t.enabled ? 'Disable' : 'Enable', () => toggleEnabled(t.id, !t.enabled)));
+  actions.appendChild(mkBtn('Delete', () => deleteTask(t.filename, t.id), 'danger'));
+  return div;
+}
+
+function renderInvalidCard(inv) {
+  const div = document.createElement('div');
+  div.className = 'task-card invalid';
+  div.innerHTML = `
+    <div class="card-head">
+      <div class="id">${escapeHtml(inv.filename)}</div>
+      <div class="card-badges"><span class="badge badge-error">invalid</span></div>
+    </div>
+    <div class="invalid-reason">${escapeHtml(inv.error)}</div>
+    <div class="card-actions"></div>
+  `;
+  const actions = div.querySelector('.card-actions');
+  actions.appendChild(mkBtn('Edit', () => openEdit(inv.filename)));
+  actions.appendChild(mkBtn('Delete', () => deleteTask(inv.filename, null), 'danger'));
+  return div;
+}
+
+async function refresh() {
+  const [data, modelInfo] = await Promise.all([
+    api('/api/tasks'),
+    api('/api/models').catch(() => null),
+  ]);
+  models = modelInfo;
+  renderModelBar(data.tasks);
+  renderSummary(data.tasks);
+
+  const grid = document.getElementById('task-grid');
+  grid.innerHTML = '';
+  if (data.tasks.length === 0) {
+    grid.innerHTML = '<p class="muted">No tasks found. Click "+ New task" to add one.</p>';
+  } else {
+    for (const t of data.tasks) grid.appendChild(renderTaskCard(t));
+  }
+
+  const invalidSection = document.getElementById('invalid-section');
+  const invalidGrid = document.getElementById('invalid-grid');
+  invalidGrid.innerHTML = '';
+  if (data.invalid.length) {
+    invalidSection.style.display = 'block';
+    for (const inv of data.invalid) invalidGrid.appendChild(renderInvalidCard(inv));
+  } else {
+    invalidSection.style.display = 'none';
+  }
+}
+
+function mkBtn(label, onClick, cls) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  if (cls) b.className = cls;
+  b.onclick = onClick;
+  return b;
+}
+
+let editingFilename = null;
+
+function openNewTask() {
+  editingFilename = null;
+  document.getElementById('edit-title').textContent = 'New task';
+  document.getElementById('filename-row').style.display = 'flex';
+  document.getElementById('edit-filename').value = '';
+  document.getElementById('edit-filename').placeholder = 'auto (from id in content)';
+  document.getElementById('edit-content').value = NEW_TASK_TEMPLATE;
+  document.getElementById('edit-error').style.display = 'none';
+  document.getElementById('describe').style.display = 'block';
+  document.getElementById('describe-log').innerHTML = '';
+  describeDraft = null;
+  document.getElementById('edit-panel').classList.add('open');
+  document.getElementById('describe-text').focus();
+}
+
+// The task file the model wrote last; a follow-up message asks it to change that.
+let describeDraft = null;
+
+function describeBubble(cls, text) {
+  const log = document.getElementById('describe-log');
+  const b = document.createElement('div');
+  b.className = 'bubble ' + cls;
+  b.textContent = text;
+  log.appendChild(b);
+  log.scrollTop = log.scrollHeight;
+  return b;
+}
+
+function describeKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); describeTask(); }
+}
+
+async function describeTask() {
+  const input = document.getElementById('describe-text');
+  const btn = document.getElementById('describe-btn');
+  const text = input.value.trim();
+  if (!text || btn.disabled) return;
+  describeBubble('you', text);
+  input.value = '';
+  btn.disabled = true;
+  const wait = describeBubble('model', 'Thinking… (the local model can take a few seconds)');
+  try {
+    const content = document.getElementById('edit-content').value;
+    const draft = describeDraft !== null && content.trim() ? content : null;
+    const data = await api('/api/tasks/draft', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text, draft}),
+    });
+    describeDraft = data.content;
+    document.getElementById('edit-content').value = data.content;
+    const m = data.content.match(/^schedule:\s*['"]?([^'"\n]+)/m);
+    const english = m ? cronToEnglish(m[1].trim()) : null;
+    const when = m ? ' It runs ' + (english ? english.toLowerCase() : 'on schedule ' + m[1].trim()) + '.' : '';
+    wait.textContent = `Filled in "${data.id}" below.${when} Check it, ask for changes, or Save.`;
+  } catch (e) {
+    wait.className = 'bubble error';
+    wait.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    input.focus();
+  }
+}
+
+async function openEdit(filename) {
+  const data = await api('/api/tasks/file/' + encodeURIComponent(filename));
+  editingFilename = filename;
+  document.getElementById('edit-title').textContent = 'Edit ' + filename;
+  document.getElementById('filename-row').style.display = 'none';
+  document.getElementById('describe').style.display = 'none';
+  document.getElementById('edit-content').value = data.content;
+  document.getElementById('edit-error').style.display = 'none';
+  document.getElementById('edit-panel').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('edit-panel').classList.remove('open');
+}
+
+async function saveTask() {
+  const content = document.getElementById('edit-content').value;
+  const errBox = document.getElementById('edit-error');
+  errBox.style.display = 'none';
+  try {
+    if (editingFilename === null) {
+      const filename = document.getElementById('edit-filename').value.trim();
+      await api('/api/tasks/file', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content, filename: filename || null}),
+      });
+    } else {
+      await api('/api/tasks/file/' + encodeURIComponent(editingFilename), {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content}),
+      });
+    }
+    closeEdit();
+    refresh();
+  } catch (e) {
+    errBox.textContent = e.message;
+    errBox.style.display = 'block';
+  }
+}
+
+async function deleteTask(filename, taskId) {
+  if (!confirm(`Delete task file ${filename}? Run history is kept.`)) return;
+  await api('/api/tasks/file/' + encodeURIComponent(filename), {method: 'DELETE'});
+  refresh();
+}
+
+async function toggleEnabled(taskId, enable) {
+  await api(`/api/tasks/${encodeURIComponent(taskId)}/${enable ? 'enable' : 'disable'}`, {method: 'POST'});
+  refresh();
+}
+
+async function runTask(taskId) {
+  const logBox = document.getElementById('run-log');
+  const reportWrap = document.getElementById('run-report-wrap');
+  logBox.textContent = '';
+  reportWrap.style.display = 'none';
+  document.getElementById('run-title').textContent = 'Running ' + taskId + '…';
+  document.getElementById('run-panel').classList.add('open');
+
+  let started;
+  try {
+    started = await api(`/api/tasks/${encodeURIComponent(taskId)}/run`, {method: 'POST'});
+  } catch (e) {
+    logBox.textContent = 'Error: ' + e.message;
+    return;
+  }
+
+  const es = new EventSource('/api/runs/stream/' + started.run_token);
+  es.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.event) {
+      if (msg.event.startsWith('using model ')) {
+        document.getElementById('run-title').textContent =
+          `Running ${taskId} on ${msg.event.slice('using model '.length)}…`;
+        refresh();  // the card and model bar show it as running
+      }
+      logBox.textContent += msg.event + '\n';
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    if (msg.done) {
+      es.close();
+      document.getElementById('run-title').textContent =
+        `${taskId} finished: ${msg.status}`;
+      if (msg.status === 'success' && msg.report_path) {
+        try {
+          const runs = await api(`/api/tasks/${encodeURIComponent(taskId)}/runs?last=1`);
+          if (runs.length) {
+            const text = await api(`/api/runs/${runs[0].run_id}/report`);
+            document.getElementById('run-report').textContent = text;
+            reportWrap.style.display = 'block';
+          }
+        } catch (e) { /* report fetch best-effort */ }
+      }
+      refresh();
+    }
+  };
+  es.onerror = () => { es.close(); };
+}
+
+function closeRun() {
+  document.getElementById('run-panel').classList.remove('open');
+}
+
+refresh();
+</script>
+</body>
+</html>
