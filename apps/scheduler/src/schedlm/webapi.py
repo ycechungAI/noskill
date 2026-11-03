@@ -151,6 +151,13 @@ def _task_summary(conn, task: tasks_mod.Task, number: int, tz, now: datetime) ->
             )
         else:
             next_run = f"once@{task.fire_at}"
+    status = last["status"] if last else None
+    # Live indicator: a task with a running_pid is in flight right now, even
+    # if the last finished run ended in error/failed (stale badge until the
+    # next run starts).
+    state_row = store_mod.get_task_state(conn, task.id)
+    if state_row is not None and state_row["running_pid"] is not None:
+        status = "running"
     return {
         "number": number,
         "id": task.id,
@@ -159,7 +166,7 @@ def _task_summary(conn, task: tasks_mod.Task, number: int, tz, now: datetime) ->
         "schedule": task.schedule or f"once@{task.fire_at}",
         "enabled": task.enabled,
         "last_run": last["started_at"] if last else None,
-        "status": last["status"] if last else None,
+        "status": status,
         "last_model": last["model"] if last else None,
         "model": task.model,  # per-task override; None = config default
         "next_run": next_run,
