@@ -416,6 +416,13 @@ def tick(
                 "task '%s' became invalid, skipping this tick: %s", row["id"], e
             )
             continue
+        except OSError as e:
+            # Missing task file (deleted outside the scheduler): skip it
+            # instead of letting it kill the daemon (spec FR-3).
+            logger.warning(
+                "task '%s' file missing, skipping this tick: %s", row["id"], e
+            )
+            continue
 
         if row["running_pid"] is not None:
             logger.warning(
