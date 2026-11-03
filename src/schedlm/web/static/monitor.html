@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent monitor</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.4;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h1 .sub { font-weight: normal; opacity: 0.6; font-size: 0.9rem; }
+  h2 { font-size: 1rem; margin: 1.5rem 0 0.6rem; }
+  #summary { opacity: 0.75; font-size: 0.9rem; margin-bottom: 1rem; }
+  button {
+    font: inherit; cursor: pointer; border: 1px solid rgba(128,128,128,0.4);
+    background: transparent; border-radius: 6px; padding: 0.3rem 0.7rem;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.85rem; }
+  .card {
+    border: 1px solid rgba(128,128,128,0.25); border-radius: 10px;
+    padding: 0.9rem 1rem; background: rgba(128,128,128,0.05);
+    display: flex; flex-direction: column; gap: 0.45rem;
+  }
+  .card.down { border-color: rgba(187,51,51,0.5); background: rgba(187,51,51,0.06); }
+  .head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+  .head .name { font-weight: 600; }
+  .badge { font-size: 0.68rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600; }
+  .badge.up { background: rgba(42,122,42,0.15); color: #2a9d2a; }
+  .badge.down { background: rgba(190,50,50,0.15); color: #d15050; }
+  .detail { font-size: 0.85rem; word-break: break-word; }
+  .muted { opacity: 0.6; font-size: 0.8rem; }
+  .stale { color: #d19a00; }
+  .log {
+    background: rgba(128,128,128,0.08); border-radius: 4px; padding: 0.5rem;
+    max-height: 220px; overflow-y: auto; font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.78rem; white-space: pre-wrap; margin: 0;
+  }
+</style>
+</head>
+<body>
+<h1>Agent monitor <span class="sub">sched</span></h1>
+<div id="summary">Checking…</div>
+<div style="margin-bottom: 1.25rem;"><button id="check-now">Check now</button></div>
+<div id="grid" class="grid"></div>
+
+<h2>Self-heal</h2>
+<div id="last-heal" class="detail"></div>
+<p class="muted">The local.agent-monitor.heal login agent checks everything at login and every 10 minutes and restarts what is down.</p>
+<pre id="heal-log" class="log"></pre>
+
+<h2>Status changes</h2>
+<pre id="events" class="log"></pre>
+
+<script>
+const HEAL_EVERY_MINUTES = 10;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function minutesAgo(stamp) {
+  const d = new Date(stamp.replace(' ', 'T'));
+  return isNaN(d) ? null : Math.round((Date.now() - d) / 60000);
+}
+
+function render(s) {
+  const down = s.services.filter(x => !x.ok);
+  document.getElementById('summary').textContent = s.services.length === 0
+    ? 'Waiting for the first check…'
+    : down.length ? `${down.length} of ${s.services.length} down: ${down.map(x => x.label).join(', ')}`
+    : `All ${s.services.length} services up`;
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for (const svc of s.services) {
+    const card = document.createElement('div');
+    card.className = 'card' + (svc.ok ? '' : ' down');
+    card.innerHTML = `
+      <div class="head">
+        <span class="name">${escapeHtml(svc.label)}</span>
+        <span class="badge ${svc.ok ? 'up' : 'down'}">${svc.ok ? 'up' : 'down'}</span>
+      </div>
+      <div class="detail">${escapeHtml(svc.detail)}</div>
+      <div class="muted">checked ${escapeHtml(svc.checked_at.slice(11))}</div>`;
+    if (!svc.ok && svc.can_heal) {
+      const btn = document.createElement('button');
+      btn.textContent = 'Restart now';
+      btn.onclick = () => heal(svc.name, btn);
+      card.appendChild(btn);
+    }
+    grid.appendChild(card);
+  }
+
+  const last = document.getElementById('last-heal');
+  if (!s.last_heal) {
+    last.innerHTML = '<span class="stale">No heal run yet. Run ./start.sh to install the login agents.</span>';
+  } else {
+    const ago = minutesAgo(s.last_heal.ran_at);
+    const late = ago !== null && ago > HEAL_EVERY_MINUTES * 2.5;
+    const fixed = s.last_heal.results.filter(r => !r.ok);
+    last.innerHTML = `Last run ${escapeHtml(s.last_heal.ran_at)}` +
+      (ago !== null ? ` (${ago} min ago)` : '') + ': ' +
+      (fixed.length ? `restarted ${escapeHtml(fixed.map(r => r.name).join(', '))}` : 'nothing needed restarting') +
+      (s.last_heal.all_ok ? '' : ' — <span class="stale">something is still down</span>') +
+      (late ? ' — <span class="stale">overdue; run ./start.sh to repair the login agent</span>' : '');
+  }
+  document.getElementById('heal-log').textContent = s.heal_log.length ? s.heal_log.join('\n') : 'Nothing has needed a restart yet.';
+  document.getElementById('events').textContent = s.events.length ? s.events.join('\n') : 'No changes since the monitor started.';
+}
+
+async function load(refresh) {
+  try {
+    const res = await fetch('/api/status' + (refresh ? '?refresh=1' : ''));
+    render(await res.json());
+  } catch (e) {
+    document.getElementById('summary').textContent = 'The monitor is not answering: ' + e.message;
+  }
+}
+
+async function heal(name, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Restarting…';
+  try {
+    const res = await fetch(`/api/services/${encodeURIComponent(name)}/heal`,
+      {method: 'POST', headers: {'X-Sched-Monitor': '1'}});
+    const out = await res.json();
+    if (!out.ok) alert(`${name} is still down.\n${out.action || out.detail}`);
+  } catch (e) { alert('Restart failed: ' + e.message); }
+  load(false);
+}
+
+const checkNow = document.getElementById('check-now');
+checkNow.onclick = async () => {
+  checkNow.disabled = true;
+  await load(true);
+  checkNow.disabled = false;
+};
+load(false);
+setInterval(() => load(false), 10000);
+</script>
+</body>
+</html>

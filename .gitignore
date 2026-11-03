@@ -1,0 +1,13 @@
+data/
+runs/
+__pycache__/
+*.egg-info/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Local, per-machine
+config.yaml
+.claude/settings.local.json
+.DS_Store
+.venv.*/
