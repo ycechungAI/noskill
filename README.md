@@ -40,6 +40,8 @@ noskill is a planned runtime that gives **local models** (Ollama, LM Studio, lla
 ## The noskill app (macOS prototype)
 One app that starts and runs noskill together with two sibling projects, **orcastrator** (long research reports, `~/dev/orcastrator`) and **sched** (prompts on a cron schedule, `~/dev/scheduler`), plus Ollama. Start All brings them all up, and one window shows each one's page with a menu-bar icon for status. Build it with `apps/macos/build-app.sh`. What it runs and how: [docs/APP.md](docs/APP.md).
 
+![The app's Ollama pane: model list, download box, ollama.com sign-in and a chat panel](apps/macos/screenshots/ollama.png)
+
 ## What it does
 - **Add skills to any local model.** Skills are agentskills.io-compatible `SKILL.md` packages. They work on models with native tool calling and, through constrained output, on models without it.
 - **Learn skills.** When a multi-step task succeeds, noskill drafts a skill and tests it. It asks you before using it the first time, then uses it automatically after 3 successful runs. Skills that keep failing get refined or retired.
