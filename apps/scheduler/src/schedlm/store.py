@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at    TEXT NOT NULL,
     finished_at   TEXT,
     status        TEXT NOT NULL CHECK
-        (status IN ('running','success','partial','error','timeout','skipped_overlap')),
+        (status IN ('running','success','partial','failed','error','timeout','skipped_overlap')),
     report_path   TEXT,
     error         TEXT,
     model         TEXT,
@@ -57,7 +57,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     row = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='runs'"
     ).fetchone()
-    if row is None or "partial" in row["sql"]:
+    if row is None or ("partial" in row["sql"] and "failed" in row["sql"]):
         return
     conn.executescript(
         """
@@ -69,7 +69,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
             started_at    TEXT NOT NULL,
             finished_at   TEXT,
             status        TEXT NOT NULL CHECK
-                (status IN ('running','success','partial','error','timeout','skipped_overlap')),
+                (status IN ('running','success','partial','failed','error','timeout','skipped_overlap')),
             report_path   TEXT,
             error         TEXT,
             model         TEXT,

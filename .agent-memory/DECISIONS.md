@@ -1,5 +1,16 @@
 # Decisions
 
+## 2026-11-03 Honest task verification + monorepo move
+**Decision:** Task honesty gets a deterministic verification layer (`sources:`, `checks:` frontmatter;
+`agent/verify.py`; one bounded retry; run statuses `success|partial|failed`) and the scheduler + orcastrator
+moved into the noskill repo (`apps/scheduler`, `apps/orcastrator`).
+**Why:** A scheduled task run reported a fabricated deals table as `success` (only a `web_search` had run,
+no post-hoc check). The chosen remedy is precise instruction following + code-level verification, not the
+noskill skill-learning loop.
+**Alternatives considered:** Learning a task "skill" from the failing run — rejected; the failure was
+prompt/URL-shape (whole `#filter:…;sort:…` shoved into a search query) plus missing outcome checking, both
+structurally fixable here.
+
 ## 2026-10-25 Housekeeping skills: Go plans, model-free jobs, gated apply tools
 **Decision:** Five built-in skills (downloads-tidy, duplicate-finder, disk-watch, media-renamer, daily-brief) keep their
 logic in `internal/chores`. Scheduled work that needs no judgement runs as model-free job kinds (`anime`, `remind`, `brief`,

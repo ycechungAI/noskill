@@ -7,6 +7,12 @@ Phase 3 (MIT, Go). The source of truth is [SPEC.md](SPEC.md) (requirements with 
 
 The module path is `noskill`, a placeholder until the GitHub org is chosen ([PACKAGING.md](docs/PACKAGING.md#name-and-signing-checks)). Change it in `go.mod` and every import once that's decided.
 
+2026-11-03: the task scheduler and the research reports moved **into this repo** (`apps/scheduler/`, `apps/orcastrator/`,
+via `git subtree add --squash`). The noskill macOS app now points at those repo paths; the old folders
+`~/dev/scheduler` and `~/dev/orcastrator` are retired tombstones (`MOVED.md`). The scheduler gained a
+deterministic run-verification gate (sources/checks, retry, statuses success|partial|failed) after a
+fabricated daily-game-deals report was recorded `success`.
+
 Build and test: `go vet ./...` and `go test ./...`. Before finishing a change, vet all six targets: `for t in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do GOOS=${t%/*} GOARCH=${t#*/} go vet ./...; done`. Any binary that runs scripts must call `platform.MaybeRunSandboxChild()` first in `main` (ADR-0008).
 
 ## Rules
@@ -58,6 +64,8 @@ internal/server/        ✓ Host/Origin/token checks, OpenAI + Ollama proxy, /no
 internal/platform/      ✓ per-OS: paths, trash, memory, sandbox (macOS only), clone, volumes list and IDs, power, installed apps, app prefs, plain notifications
 internal/store/         ✓ sqlite + forward-only migrations
 apps/macos/             ✓ the noskill app (SwiftUI, macOS only): starts and shows noskill, orcastrator and sched (FR-I8, ADR-0017; prototype)
+apps/scheduler/         ✓ the task scheduler, now IN THIS REPO (moved from ~/dev/scheduler on 2026-11-03; git subtree --squash; honest run verification, sources/checks)
+apps/orcastrator/       ✓ the research reports (STORM), now IN THIS REPO (moved from ~/dev/orcastrator on 2026-11-03; git subtree --squash)
 scripts/docsite/        ✓ builds the docs site from the Markdown (static HTML; fails on broken links; `go run ./scripts/docsite`)
 skills/                 ✓ 15 built-in skills embedded (web-search, research, storm, files, orchestrator, model-manager, code-runner, anime-tracker, watcher, local-docs, downloads-tidy, duplicate-finder, disk-watch, media-renamer, daily-brief); skill-author is a spec for the learning loop
 ```

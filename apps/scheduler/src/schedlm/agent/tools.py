@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # is a placeholder until PACKAGING.md decides the home in the noskill repo.
 _USER_AGENT = "sched/1.0 (local task scheduler; https://github.com/ycechungAI/noskill)"
 _MAX_REDIRECTS = 3
-_FETCH_TIMEOUT_SECONDS = 10.0
+_FETCH_TIMEOUT_SECONDS = 30.0
 
 TOOL_SCHEMAS = [
     {

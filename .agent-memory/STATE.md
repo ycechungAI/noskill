@@ -1,155 +1,69 @@
 # Current state
 
-_Last updated: 2026-10-24 by Claude Code_
+_Last updated: 2026-11-03 by Flint (OpenCode) after the monorepo move + task-verification work_
 
 ## In progress
 
-- Uncommitted changes on top of `3dfeac0 start` adding `orchestrator.exclude` (FR-O2): a config
-  list of model names the router must never pick, even when installed and memory is free
-  (`run --model` can still name one on purpose). Touches:
-  - `internal/config/config.go` — new `Exclude []string` field on `Orchestrator`
-  - `internal/config/check.go` — validates no entry in `exclude` is blank
-  - `internal/orchestrator/route.go` — router rejects a model found in `Cfg.Exclude`
-  - `internal/orchestrator/orchestrator_test.go` — new test coverage
-  - Docs trimmed alongside it: `docs/CONFIG.md`, `docs/ORCHESTRATOR.md`, `docs/PROXY.md`,
-    `docs/START.md`, `docs/WEEK_RUN.md`, `start.sh`, `start.ps1` (small doc/script cleanups, not
-    all directly tied to `exclude` — worth a closer look before committing to confirm they're
-    meant to land together).
+- **Move: scheduler + orcastrator now live inside the noskill repo** (`apps/scheduler/`, `apps/orcastrator/`,
+  via `git subtree add --squash` on branches `feature/describe-task` and `feature/setup-flag`).
+  - Old folders `~/dev/scheduler` and `~/dev/orcastrator` retired as working trees: git history kept via
+    their `.git`, working content gutted to a `MOVED.md` tombstone (to do, see Next steps).
+  - Repointed: `apps/macos/Sources/NoskillApp/Config.swift` defaults, `~/Library/Application Support/noskill/app.json`
+    (`schedulerDir`/`orcastratorDir` now `…/dev/noskill/apps/{scheduler,orcastrator}`), docs/APP.md,
+    docs/ADR-0017 (2026-11-03 addendum), noskill README, macOS app test fixtures, both moved repos'
+    READMEs. The app now runs the three parts from the monorepo folders.
+  - Runtime state migrated: copied `data/` + `runs/` + `config.yaml` from `~/dev/scheduler` to
+    `apps/scheduler/`, rebuilt both `.venv`s there (apps/scheduler/.venv via `_venv.sh`, apps/orcastrator/.venv
+    via start.sh --setup), restarted noskill serve / sched daemon + serve / orcastrator-web from the new
+    folders; verified ports 11435 / 8787 / 8400 listening again.
+  - Commit: `a35c89c` "Tasks: honest run verification, sources-driven instruction following, delete fix, monorepo move".
+
+- **Task verification work (2026-11-03)** — triggered by the daily-game-deals incident (fabricated deal table,
+  `status: success` after a useless single search).
+  Implemented in `apps/scheduler/src/schedlm/`:
+  - `agent/verify.py`: deterministic checks (no_web_data; required_source_not_fetched/failed via new task
+    frontmatter `sources:`; unbacked_report via `checks.require_cited_sources`; min_report_links).
+  - Task frontmatter gained optional `sources:` (URLs that must be fetched with `fetch_page`) and `checks:`
+    (require_sources, min_report_links, require_cited_sources) + validation.
+  - Executor: appends imperative `_sources_block()` after the prompt; on finalization runs verification; one
+    bounded retry (`CHECKS_FAILED`) naming failures; honest status success|partial|failed recorded.
+  - Store: `runs.status` CHECK now allows `partial` (+ live-DB migration in `init_db`); report frontmatter
+    gained `checks_failed:`; CLI prints partial-as-warnings.
+  - Verdict chosen for the user's question ("learn new skills vs more precise instruction following"):
+    **precise instruction following + deterministic verification** (recommended), rather than the noskill
+    skill-learning loop — the fabrication here was instruction-shape/URL-shape failure on a plain task loop.
+
+- **Fixes this session**:
+  - Delete on the sched Tasks tab was dead *inside the noskill app*: the embedded WKWebView had no UI delegate
+    so JS `window.confirm()` silently returned false; replaced with a two-step JS button (`data-del`
+    disarm/undo). Native JS `alert()` (error paths) still wants a WKUIDelegate (possible follow-up).
+  - `fetch_page`: accepts JSON APIs (`application/json` / `.json` URLs); prepends note when URL has a `#`
+    fragment (browser-only state; fetch returns the unfiltered page).
+
+- **Task rewrite**: `daily-game-deals` now runs on the CheapShark JSON deals source (`sources:` +
+  `checks:` in task file) instead of an impossible isthereanydeal `#filter:…;sort:expiry` fetch. ITAD tasks
+  can still use `sources:` for unfiltered browsing fetches.
 
 ## Next steps
 
-- Review the full diff (`git diff`) and decide whether the docs/start-script edits belong in the
-  same commit as `orchestrator.exclude`, or should be split out.
-- Run `go vet ./...` and `go test ./...` across all six OS/arch targets (see AGENTS.md's build
-  loop) before committing.
-- Commit referencing `FR-O2`.
+- Live-check: `sched run daily-game-deals` once the stack is healthy, watch honest status. (Just restarted:
+  noskill serve / sched daemon + serve / orcastrator-web from new monorepo paths; ports 11435/8787/8400
+  re-listening — verify ollama is up.)
+- Decide whether the noskill Go side (`internal/app`, FR jobs) gets the same verification shape.
+- Add WKUIDelegate to the app's WKWebView for JS alert/confirm in embedded pages.
+- Gut the retired repo folders to `MOVED.md` tombstones (todo) — don't delete before the above.
 
 ## Gotchas
 
-- `qwen3:4b` always reasons (~1,000 tokens/step, ~3 min/task) — too slow for test runs; use
-  `--model granite4:3b` (main, ~9s/task, tool-calling) or `gemma3:1b` (backup, plain tasks only,
-  no tools) instead. `llama3.2` was already tried and dropped (3/10 on checked `files` tasks).
-- Any binary that runs scripts must call `platform.MaybeRunSandboxChild()` first in `main`
-  (ADR-0008) — easy to forget when adding a new `cmd/` entry point.
+- `granite4.2:3b`: tool-calling fix via `ThinkLevel` scoping to the `granite4.2` prefix (see Update 2026-10-26).
+- Any binary that runs scripts must call `platform.MaybeRunSandboxChild()` first in `main` (ADR-0008) — easy to
+  forget when adding a new `cmd/` entry point.
+- After `git subtree add`, file owner/perm bits can be off: `chmod -R u+rwX` on the added dirs.
 
-## Update 2026-10-25
+## Update 2026-11-03
 
-- `orchestrator.exclude` and the status-page model actions / Add-a-job form are committed and live.
-- New job kind `anime` (`noskill schedule add anime:download,file ...`): the scheduler runs the
-  anime tracker's stages directly with no model (`Jobs.animeRun`, FR-J1). The live `anime-nightly`
-  and `anime-follow` jobs use it (a model-driven follow run took 13 min and wandered; this takes ~10 s).
-- Gotcha: a rebuilt `~/.noskill/bin/noskill` is a new binary to Little Snitch and to Full Disk
-  Access: its Nyaa calls fail with "connect: bad file descriptor" until the user allows it again.
-- Status page can bench decision (JEV) and embedding models (`App.BenchOther`, `internal/app/benchother.go`)
-  and pull staple models that aren't installed (`internal/app/staples.go`, task kind `pull`). Baseline
-  embedding results: `docs/EMBEDDING_BENCH.md`. The live daemon needs a rebuild to get these.
-
-## Update 2026-10-25 (housekeeping skills)
-
-- Added 5 built-in skills: downloads-tidy, duplicate-finder, disk-watch, media-renamer, daily-brief (`skills/`,
-  `internal/chores`, `internal/tools/builtin/chores.go`, `internal/app/chores.go`). New job kinds `remind`, `brief`,
-  `diskwatch`; CLI `noskill remind` and `noskill brief`. Live-checked with granite4:3b in a scratch home.
-- Not done: the live daemon still runs the older build; none of the five is scheduled yet (no `brief`/`diskwatch` jobs
-  added to the user's config); disk-watch `volumes` setting untested on Windows/Linux (uses platform.ListVolumes).
-- Status page: Brief section (digest + reminders box) between Skills and Models; endpoints `/noskill/v1/brief`,
-  `/noskill/v1/reminders`. Housekeeping eval suite `internal/eval/tasks/chores.yaml` (11 tasks; granite4:3b scores
-  8-10 of 11 run to run; tidy-01/tidy-02/rename-01 are the flaky ones). Eval tasks can now set `aged_days` and put files in subfolders.
-- `./web.sh`: serves the docs site (8767) and the Phase 0 spike status (8765) in one run; the noskill status page has a
-  Spikes tab that frames both (CSP `frame-src` allows only those two local ports). Windows: web.ps1 (written, not run on Windows). Both are the `web` item in start.sh / start.ps1.
-- internal/deepresearch (the deep-research pipeline) is written and tested but not yet wired to a skill/tool/CLI/status page.
-
-## Update 2026-10-26 (granite4.2:3b tool-calling fix)
-
-- The user installed `granite4.2:3b` (replacing `granite4:3b`, no longer on this machine) and its eval score
-  came in low: 76/96, against `granite4:3b`'s best recorded 84/96 (`eval history`). Root cause, checked live:
-  the agent loop forces `think=false` on every non-final step; granite4.2's template mishandles full-off
-  thinking, so it skipped tool calls (docs_search, tidy_apply, rename_apply) and once leaked a stray
-  `</think>` into a plain answer. `think="low"` fixed both, and was faster than the `false` run's rambling.
-  `granite4:3b` wasn't affected (it scored well at `think=false` already).
-- Fix: `backends.ChatRequest.ThinkLevel` (string, sent as Ollama's `think` field instead of the bool) +
-  `agent.Request.ToolThinkLevel`, applied on non-final steps only. `internal/app/run.go`'s `toolThinkLevel`
-  scopes it to model name prefix `granite4.2` (not the whole `granite` family or every thinking-capable
-  model) to avoid the latency problem `think=false` exists to prevent (docs/MODEL_ADAPTERS.md "Other
-  small-model tactics"). Two full-suite re-runs after the fix: 82/96 then 84/96 — matches `granite4:3b`'s
-  best. Code/math/summarise dips in the first re-run were confirmed as ordinary sampling noise (a
-  category-only re-run came back clean), not caused by the change.
-- Not done: no live check yet with the *old* `granite4:3b` tag re-pulled to confirm zero regression there
-  (it's simply not installed on this machine right now); the fix is scoped narrowly enough that this seems
-  low-risk, but worth a check if that model comes back into use.
-
-## Update 2026-10-27 (new macOS user `ycechung`)
-
-- Set up from scratch for this user: `./start.sh install -y` (noskill in `~/.local/bin`, granite4:3b + gemma3:1b),
-  `noskill models probe`, `ollama pull tev1:0.8b nomic-embed-text`, `noskill daemon install` (launchd, runs
-  `~/.local/bin/noskill serve` on 11435, not a copy in `~/.noskill/bin`). `noskill doctor` all ok. No jobs scheduled.
-- README "After installing" section added with these steps.
-- Gotcha: the repo's files have empty owner permission bits (`d---r-x---`) and work only through ACLs, likely from
-  being copied from another account. Not changed; `chmod -R u+rwX` would fix it if "permission denied" shows up.
-- Seen once: the router sent "what is 17 * 23?" to gemma3:1b, which answered 1587 (a later run answered 391).
-- Fixed (uncommitted): `noskill daemon stop` then `start` failed on macOS ("Could not find service", exit 113):
-  Start decided bootstrap-vs-kickstart from Status().Installed, which is true whenever the plist exists. It now asks
-  `launchctl print` (TestDarwinStartAfterStop). start.sh's PATH hint now names ~/.zshrc / ~/.bashrc, not ~/.profile.
-- Gotcha: Edit/rewrite of a repo file drops its ACL and leaves it unreadable (owner bits empty); `chmod u+rw` it after.
-- /opt/homebrew (and its Go) belongs to the other account on this Mac (uid 501); this user can use but not manage it.
-
-## Update 2026-10-27 (job backups, FR-J6)
-
-- New: `noskill schedule backup [--to f] | backups | restore <name|file>`, job kind `backup` (target `backup`, name
-  `jobs-backup`, no notify by default), endpoints `GET/POST /noskill/v1/jobs/backups` + `POST /noskill/v1/jobs/restore`,
-  and a "Back up and restore jobs" panel under "Add a job" (`internal/app/jobbackup.go`). Backups are settings only, in
-  `<data>/backups/jobs-<date>-<time>.json`; an unchanged job list writes nothing. Restore adds, never replaces (skips taken names).
-- Fixed: `daemon stop` returned before launchd unloaded the agent, so a `start` right after kickstarted the dying copy and the
-  daemon ended up stopped. Stop now waits (up to 10 s) for `launchctl print` to fail.
-- User's live setup: jobs and config restored from `/Users/Shared/neolinux/.noskill` (the old account's copy); 51 anime titles
-  repointed from `/Users/neolinux/Movies/Anime` to `/Users/ycechung/Movies/Anime` (snapshot `state.db.before-anime-folder`).
-  One backup made: `jobs-20261027-161002.json`. No scheduled `backup` job added yet.
-- User doesn't install Homebrew on this account; `go` here is still `/opt/homebrew/bin/go` from the other account (uid 501).
-
-## Update 2026-10-30 (CLI typo suggestions)
-
-- An unknown top-level command now suggests the nearest one (`noskill dameon` → "did you mean `noskill daemon`?")
-  instead of printing the full command list (`nearestCommand`/`editDistance` in `internal/cli/cli.go`; adjacent swaps
-  count as one edit; names of 4 letters or fewer allow 1 edit, longer ones 2). Subcommands (`daemon strat`) don't suggest yet.
-- `noskill daemon start` checked live: stop→start cycles all work. It still prints "✓ started" without checking the
-  server answers (install does), and daemon.log's "serving"/"stopped" lines have no timestamps.
-
-## Update 2026-11-01
-
-- New: **the noskill app** (FR-I8, ADR-0017, docs/APP.md), a SwiftUI macOS prototype in `apps/macos/`.
-  It starts/stops/watches Ollama, `noskill serve`, orcastrator (`~/dev/orcastrator`, :8400) and sched
-  (`~/dev/scheduler`, daemon + :8787) and shows their pages in one window, plus a menu-bar icon.
-  Build `apps/macos/build-app.sh`, test `apps/macos/test.sh` (14 tests). Verified live: Start All on
-  launch brings all five up; quit stops what it started and leaves an external Ollama running.
-- Uncommitted as of this update (docs, SPEC FR-I8, AGENTS layout line, apps/macos).
-- Next: commit; then decide whether to merge sched tasks into noskill jobs and orcastrator's STORM
-  report into `internal/deepresearch` (ADR-0017 option 2).
-- Gotcha: starting `noskill serve` from the app runs the jobs' missed-run policy (jobs stopped on
-  2026-10-30 when the daemon wasn't running).
-
-## Update 2026-11-02 (noskill app: Setup, Ollama pane, DMG)
-
-- The app (apps/macos, v0.2.0) now has Setup (welcome on first run when app.json is missing; one-click,
-  ask-first fixes: install Ollama, pull models, install the bundled agent / `noskill init`, uv-Python
-  .venv for orcastrator (`./start.sh --setup`, branch feature/setup-flag there) and sched (`_venv.sh`),
-  repair owner permissions, choose folders), an Ollama pane (install, models, Find a model guide with
-  favourites/recent, sign in/out, chat), per-tab Start/Stop, and `make-dmg.sh` (build, package, mount,
-  verify, `--self-test`). 48 tests in ~0.01 s; build-app.sh tests first. `--snapshot DIR` draws the panes.
-- Stuck clicks: logs moved out of Supervisor (LogStore), one state publish per check, web views kept in
-  place and hidden instead of moved, sidebar can't be deselected. Not confirmed by clicking (no
-  accessibility/screen-recording permission here); ask the user.
-- sched: describe-a-task box in the New task panel (POST /api/tasks/draft), branch feature/describe-task.
-- Checked by hand: DMG installs to ~/Applications (this account can't write /Applications); a fresh start
-  with app.json moved aside shows the welcome and writes nothing. Not run live: the Ollama download, the
-  uv/venv build, repair, bundled-agent install (scripts are tested; repair tested on a scratch folder).
-- The user's app.json is at the session scratchpad as app.json.before-fresh-test; the app writes a new one
-  when Setup finishes.
-
-## Update 2026-11-03 (v0.2.0 published)
-
-- `feature/macos-app-setup` fast-forwarded to `main` and pushed; tag **v0.2.0** (annotated) pushed to
-  origin (ycechungAI/noskill) from 60f715e. `go vet ./...` and `go test ./...` green on darwin/arm64
-  before tagging (not the full six-target vet loop).
-- GitHub Release page created with hand-written notes (https://github.com/ycechungAI/noskill/releases/tag/v0.2.0);
-  `gh` was blocked by api.github.com timeouts until the user fixed the firewall. GoReleaser
-  (`goreleaser release`) would also publish it, but needs NOSKILL_UPDATE_PUBKEY set.
-- This was the repo's **first tag** — no v0.1.0 exists despite PACKAGING.md's v0.1/v0.2 channel matrix.
+- Monorepo move landed (commit `a35c89c`); runtime state migrated, venvs rebuilt, services restarted from
+  the new paths.
+- Task-verification work landed (commit `a35c89c`); 163 sched tests pass; honest statuses + sources/checks +
+  retry implemented and tested.
+- Delete bug fixed in sched web UI (two-click); app WKWebView native-dialog gap documented, open.

@@ -285,7 +285,7 @@ def execute_and_record(
                 trigger,
                 now,
                 finished,
-                "success",
+                result.status,
                 result,
                 task.output,
                 default_runs_dir=Path(cfg.paths.runs),
