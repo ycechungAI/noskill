@@ -6,6 +6,8 @@ cd "$(dirname "$0")"
 DEV="$(xcode-select -p)"
 F="$DEV/Library/Developer/Frameworks"
 L="$DEV/Library/Developer/usr/lib"
-exec swift test --build-system native \
+SDK=()
+[[ -n "${NOSKILL_SDK:-}" ]] && SDK=(--sdk "$NOSKILL_SDK")
+exec swift test --build-system native "${SDK[@]}" \
   -Xswiftc -F -Xswiftc "$F" -Xlinker -F -Xlinker "$F" \
   -Xlinker -rpath -Xlinker "$F" -Xlinker -rpath -Xlinker "$L" "$@"

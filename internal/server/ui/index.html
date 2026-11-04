@@ -52,6 +52,9 @@ p.lead{margin:0 0 8px;color:var(--mute)}
 .addf{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 10px;align-items:center}
 .addf select,.addf input{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:100%}
 .addf input:focus-visible,button:focus-visible,#tabs button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.chatin{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:8px;align-items:end;margin-top:8px}
+.chatin textarea{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);resize:vertical;min-width:0;width:100%}
+.chatin textarea:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;white-space:pre-wrap;font:12px ui-monospace,Menlo,Consolas,monospace}
 .path{font:12px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
 </style>
@@ -76,9 +79,14 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
 <main>
   <div class="tabpanel" id="p-overview" role="tabpanel" aria-labelledby="tab-overview">
     <section class="wide" id="s-jobs"><h2>Jobs</h2><div class="scroll" id="jobs"></div>
-      <details id="addjob" style="margin-top:10px"><summary style="cursor:pointer;color:var(--acc)">Add a job</summary>
+      <details id="addjob" style="margin-top:10px"><summary id="addjob-sum" style="cursor:pointer;color:var(--acc)">Add a job</summary>
         <p class="lead" style="margin-top:8px">Run a skill or a prompt on a schedule. The daemon picks it up within a few seconds. Permissions beyond the skill's own (<code>--allow</code>) are set with <code>noskill schedule add</code>.</p>
-        <form class="addf" id="jobf" autocomplete="off">
+        <div class="chatin">
+          <textarea id="job-describe" rows="2" spellcheck="false" aria-label="Describe the job" placeholder="Describe the job: which skill or prompt to run, and when. e.g. every weekday at 8am run daily-brief and tell me the result"></textarea>
+          <button type="button" id="job-fill">Auto fill</button>
+        </div>
+        <p class="mute" id="fill-msg" role="status" style="margin:6px 0 0"></p>
+        <form class="addf" id="jobf" autocomplete="off" style="margin-top:8px">
           <label for="job-target" class="mute">What</label><input id="job-target" type="text" spellcheck="false" list="job-skills" placeholder="a skill name, or a sentence to run" required>
           <datalist id="job-skills"></datalist>
           <label for="job-kind" class="mute">When</label>
@@ -88,7 +96,9 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
           <label for="job-prompt" class="mute">Task</label><input id="job-prompt" type="text" placeholder="optional: what a skill job should do (default: the skill's own task)">
           <label for="job-only" class="mute">Only when</label><input id="job-only" type="text" spellcheck="false" placeholder="optional: volume:RED, ac-power, unmetered, window:01:00-06:00 (comma-separated)">
           <span></span><label class="row"><input type="checkbox" id="job-notify" checked> tell me the result (OS notification)</label>
-          <span></span><span class="row"><button class="go" id="job-go" type="submit">Add job</button><span id="job-msg" role="status"></span></span>
+          <label for="job-retries" class="mute">Retries</label><input id="job-retries" type="number" min="0" max="10" placeholder="optional: how many times to retry a failed run (default: the scheduler's)">
+          <label for="job-timeout" class="mute">Timeout</label><input id="job-timeout" type="text" spellcheck="false" placeholder="optional: e.g. 30m (default: the scheduler's)">
+          <span></span><span class="row"><button class="go" id="job-go" type="submit">Add job</button><button type="button" id="job-cancel" hidden>Cancel edit</button><span id="job-msg" role="status"></span></span>
         </form></details>
       <details id="jobbak" style="margin-top:6px"><summary style="cursor:pointer;color:var(--acc)">Back up and restore jobs</summary>
         <p class="lead" style="margin-top:8px">A backup is a small file with every job's settings, kept in <code id="bak-folder">the backups folder</code>. Restoring adds the jobs you don't have and leaves the ones you do alone. To back up on a schedule, add a job whose What is <code>backup</code>.</p>
@@ -96,6 +106,9 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
           <input type="file" id="bak-file" accept=".json,application/json" hidden><button type="button" id="bak-pick">Restore from a file…</button>
           <span id="bak-msg" role="status"></span></div>
         <div class="scroll" id="bak-list"></div></details></section>
+    <section class="wide" id="s-results"><h2>Job results</h2>
+      <p class="lead" style="margin-top:0">The latest runs of your jobs. <span class="ok">ok</span> finished, <span class="warn">warning</span> didn't run as planned, <span class="bad">error</span> failed.</p>
+      <div class="scroll" id="job-results"></div></section>
     <section id="s-skills"><h2>Skills</h2><div class="scroll" id="skills"></div></section>
     <section id="s-learning"><h2>Learning</h2><div class="scroll" id="learning"></div><h2 style="margin-top:14px">Evaluation</h2><div class="scroll" id="eval"></div></section>
     <section class="wide" id="s-brief"><h2>Brief</h2>
@@ -109,7 +122,12 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
         <button class="go" id="rem-go" type="submit">Add reminder</button>
         <span id="rem-msg" role="status" style="grid-column:1/-1"></span></form>
       <div class="scroll" id="reminders"></div></section>
-    <section class="wide" id="s-models"><h2>Models</h2><div id="mtask"></div><div class="scroll" id="models"></div>
+    <section class="wide" id="s-models"><h2>Models</h2>
+      <div class="row" style="margin-bottom:8px"><label for="draft-model" class="mute">Auto fill uses</label>
+        <select id="draft-model" aria-label="Model for Auto fill"></select><span class="mute" id="draft-model-msg" role="status"></span></div>
+      <div class="scroll" id="draft-rec" style="margin-bottom:12px"></div>
+      <div id="mtask"></div><div class="scroll" id="models"></div>
+      <h2 style="margin-top:14px">Scores</h2><p class="lead" style="margin:0 0 6px">Base 100. A score above 100 means the model is stronger than the base.</p><div class="scroll" id="scores"></div>
       <p class="lead" style="margin:8px 0 0">Bench times a model and runs the quick quality check (a few minutes at most); it unloads the model first. One action runs at a time, and none starts while a scheduled job is running.</p></section>
   </div>
   <div class="tabpanel" id="p-approvals" role="tabpanel" aria-labelledby="tab-approvals">
@@ -119,6 +137,7 @@ pre.msg{margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--l
   </div>
   <div class="tabpanel" id="p-downloads" role="tabpanel" aria-labelledby="tab-downloads">
     <section class="wide"><h2>Planning ahead</h2><div id="dl-ask"></div><div id="dl-waiting"></div></section>
+    <section><h2>In progress</h2><div class="scroll" id="dl-progress"></div></section>
     <section><h2>Finished, waiting to be filed</h2><div class="scroll" id="dl-finished"></div><div id="dl-filemsg"></div></section>
     <section><h2>Add a download</h2>
       <p class="lead">A magnet link, a link to a .torrent file, or a Nyaa page. It is filed in the folder you choose when it finishes, and stops seeding then.</p>
@@ -241,23 +260,32 @@ function render(d) {
     j.enabled ? ago(j.next) : chip("paused", "warn"),
     j.running ? chip("running", "ok") : (j.last ? el("span", {class: j.last === "done" || j.last === "ok" ? "ok" : (j.last === "failed" ? "bad" : "")}, j.last + " " + ago(j.last_at)) : ""),
     el("span", {class: "row"},
+      el("button", {onclick: () => editJob(j)}, "Edit"),
       el("button", {onclick: () => act("/noskill/v1/jobs/" + j.id + "/run")}, "Run now"),
       el("button", {onclick: () => act("/noskill/v1/jobs/" + j.id + "/" + (j.enabled ? "pause" : "resume"))}, j.enabled ? "Pause" : "Resume"))])) || empty("No jobs. Add one with noskill schedule add."));
+
+  put("job-results", table(["When", "Job", "Result", "Message"], (s.job_results || []).map(r => [
+    ago(r.at), r.job, el("span", {class: {ok: "ok", warning: "warn", error: "bad", running: "mute"}[r.level]}, r.status),
+    el("div", {class: r.level === "error" ? "bad" : ""}, r.message)])) || empty("No job has run yet."));
 
   put("runs", table(["When", "Model", "Task", "Result", "Time"], s.runs.map(r => [
     ago(r.at), r.model || "", r.task_type || r.source,
     el("span", {class: r.outcome === "success" ? "ok" : r.outcome === "fail" ? "bad" : (r.status === "done" ? "" : "warn")}, r.outcome || r.status),
     (r.ms / 1000).toFixed(1) + " s · " + r.tokens + " tok"])) || empty("No runs yet."));
 
-  put("models", table(["Model", "Size", "Speed", "Cold load", "Quality by task type", "", "Actions"], s.models.map(m => [
+  put("models", table(["Model", "Size", "Speed", "Cold load", "", "Actions"], s.models.map(m => [
     m.name, m.size_gb.toFixed(1) + " GB",
     m.tok_s ? m.tok_s.toFixed(0) + " tok/s" : m.latency_ms ? m.latency_ms.toFixed(0) + " ms / " + (m.caps.includes("decide") ? "decision" : "text") : el("span", {class: "mute"}, "not benched"),
     m.load_s ? m.load_s.toFixed(1) + " s" : "",
-    m.quality ? el("span", {class: "row"}, Object.keys(m.quality).sort().map(k => el("span", {title: k + " " + m.quality[k].toFixed(2)},
-      el("span", {class: "q"}, el("i", {style: "width:" + Math.round(m.quality[k] * 100) + "%"})), k))) : "",
     m.loaded ? chip("loaded", "ok") : "", modelActions(m)]).concat((s.missing || []).map(x => [
       el("span", {}, x.name, el("div", {class: "mute"}, x.role)), "≈ " + x.size_gb.toFixed(1) + " GB",
-      el("span", {class: "mute"}, "not installed"), "", "", "", pullButton(x.name)]))) || empty("No models found. Is Ollama running?"));
+      el("span", {class: "mute"}, "not installed"), "", "", pullButton(x.name)]))) || empty("No models found. Is Ollama running?"));
+  const scoreCols = [["chat", "Chat"], ["code", "Code"], ["extract", "Extract"], ["math", "Math"], ["reasoning", "Reasoning"], ["summarise", "Summarize"], ["translate", "Translate"]];
+  const scored = s.models.filter(m => m.quality);
+  const best = Object.fromEntries(scoreCols.map(([k]) => [k, Math.max(0, ...scored.map(m => m.quality[k] || 0))]));
+  put("scores", scored.length ? table(["Model", ...scoreCols.map(c => c[1])], scored.map(m => [
+    m.name, ...scoreCols.map(([k]) => m.quality[k] === undefined || !best[k] ? el("span", {class: "mute"}, "–")
+      : el("span", {title: m.quality[k].toFixed(2) + " of best " + best[k].toFixed(2)}, String(Math.round(m.quality[k] / best[k] * 100))))])) : empty("No scores yet. Run noskill bench."));
   const bad = s.backends.filter(b => !b.ok);
   if (bad.length) $("models").prepend(el("div", {class: "bad"}, bad.map(b => b.id + ": " + b.error)));
 
@@ -276,21 +304,119 @@ function render(d) {
 
 // ---- add a job (POST /noskill/v1/jobs: the same checks as `noskill schedule add`) ----
 $("job-kind").onchange = () => { $("job-when").placeholder = $("job-kind").value === "cron" ? '0 3 * * *   (minute hour day month weekday, local time)' : "6h, 30m, 1d"; };
+// Model for Auto fill (GET/POST /noskill/v1/jobs/draft-model). The first choice is automatic: the
+// installed chat model the learning passes would use. Picking a model saves it.
+let dmLoaded = 0, dmRec = [], dmPage = 0;
+const DM_PER = 3;
+async function loadDraftModel() {
+  dmLoaded = Date.now();
+  const r = await api("/noskill/v1/jobs/draft-model");
+  if (!r.ok) return;
+  const d = await r.json(), sel = $("draft-model");
+  const names = d.choices || [];
+  sel.replaceChildren(
+    el("option", {value: ""}, d.using ? "Automatic (" + d.using + ")" : "Automatic (no chat model installed yet)"),
+    ...names.map(n => el("option", {value: n}, n)));
+  sel.value = d.chosen && names.includes(d.chosen) ? d.chosen : "";
+  dmRec = d.recommended || [];
+  renderDraftRec();
+}
+// The recommended models, a few at a time, each with a Pull button until it's installed.
+function renderDraftRec() {
+  const box = $("draft-rec");
+  if (!dmRec.length) { box.replaceChildren(); return; }
+  const pages = Math.ceil(dmRec.length / DM_PER);
+  dmPage = Math.max(0, Math.min(dmPage, pages - 1));
+  const items = dmRec.slice(dmPage * DM_PER, dmPage * DM_PER + DM_PER);
+  box.replaceChildren(
+    el("div", {class: "mute", style: "margin-bottom:4px"}, "Recommended for Auto fill. Pull one to download it."),
+    table(["Model", "Size", "Role", ""], items.map(p => [
+      p.name, p.size_gb.toFixed(1) + " GB", el("span", {class: "mute"}, p.role),
+      p.installed ? chip("installed", "ok") : pullButton(p.name)])),
+    el("div", {class: "row", style: "margin-top:6px"},
+      el("button", dmPage === 0 ? {disabled: "", onclick: null} : {onclick: () => { dmPage--; renderDraftRec(); }}, "‹ Prev"),
+      el("span", {class: "mute"}, "Page " + (dmPage + 1) + " of " + pages),
+      el("button", dmPage >= pages - 1 ? {disabled: "", onclick: null} : {onclick: () => { dmPage++; renderDraftRec(); }}, "Next ›")));
+}
+$("draft-model").onchange = async () => {
+  const sel = $("draft-model"), msg = $("draft-model-msg");
+  msg.className = "mute"; msg.textContent = "saving…";
+  const r = await api("/noskill/v1/jobs/draft-model", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({model: sel.value})});
+  let j = {}; try { j = await r.json(); } catch (x) {}
+  if (r.ok) { msg.className = "ok"; msg.textContent = "Auto fill will use " + (sel.value || j.using || "the automatic model") + "."; loadDraftModel(); }
+  else { msg.className = "bad"; msg.textContent = (j.error && j.error.message) || "Couldn't save (" + r.status + ")"; loadDraftModel(); }
+};
+
+// Auto fill (POST /noskill/v1/jobs/draft): the local model fills the form from the description. It
+// never adds the job; the user checks and edits the fields, then presses Add job.
+$("job-fill").onclick = async () => {
+  const msg = $("fill-msg"), btn = $("job-fill"), text = $("job-describe").value.trim();
+  if (!text) { msg.className = "bad"; msg.textContent = "Describe the job first."; return; }
+  btn.disabled = true; msg.className = "mute"; msg.textContent = "Filling in the details…";
+  const r = await api("/noskill/v1/jobs/draft", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({text})});
+  let j = {}; try { j = await r.json(); } catch (x) {}
+  btn.disabled = false;
+  if (!r.ok) { msg.className = "bad"; msg.textContent = (j.error && j.error.message) || "Couldn't fill it in (" + r.status + ")"; return; }
+  const d = j.draft;
+  $("job-target").value = d.target || "";
+  $("job-kind").value = d.kind; $("job-kind").onchange();
+  $("job-when").value = d.when || "";
+  $("job-name").value = d.name || "";
+  $("job-prompt").value = d.prompt || "";
+  $("job-only").value = (d.only || []).join(", ");
+  $("job-notify").checked = !!d.notify;
+  msg.className = d.notes && d.notes.length ? "warn" : "ok";
+  msg.textContent = "Filled in by " + d.model + ". Check the details below, then Add job." + (d.notes && d.notes.length ? " " + d.notes.join("; ") + "." : "");
+};
+
+// Edit a job (FR-J8): the add form fills in from the job, and Save changes sends it to the job.
+let editingId = null;
+function setEditing(id) {
+  editingId = id;
+  $("job-go").textContent = id ? "Save changes" : "Add job";
+  $("job-cancel").hidden = !id;
+  $("addjob-sum").textContent = id ? "Edit job" : "Add a job";
+}
+function editJob(j) {
+  const sp = j.spec || {};
+  $("addjob").open = true;
+  $("job-target").value = sp.target || "";
+  $("job-kind").value = sp.cron ? "cron" : "every";
+  $("job-kind").onchange();
+  $("job-when").value = sp.cron || sp.every || "";
+  $("job-name").value = sp.name || "";
+  $("job-prompt").value = sp.prompt || "";
+  $("job-only").value = (sp.when || []).join(", ");
+  $("job-notify").checked = (sp.notify || []).includes("os");
+  $("job-retries").value = sp.retries != null ? sp.retries : "";
+  $("job-timeout").value = sp.timeout || "";
+  setEditing(j.id);
+  $("job-msg").textContent = "";
+  $("addjob").scrollIntoView({block: "center"});
+}
+function clearAddForm() {
+  for (const id of ["job-target", "job-name", "job-prompt", "job-only", "job-retries", "job-timeout"]) $(id).value = "";
+}
+$("job-cancel").onclick = () => { setEditing(null); clearAddForm(); $("job-msg").textContent = ""; };
 $("jobf").onsubmit = async e => {
   e.preventDefault();
   const msg = $("job-msg"), go = $("job-go");
   const body = {target: $("job-target").value, name: $("job-name").value, prompt: $("job-prompt").value,
-    when: $("job-only").value.split(",").map(x => x.trim()).filter(Boolean), notify: $("job-notify").checked ? ["os"] : []};
+    when: $("job-only").value.split(",").map(x => x.trim()).filter(Boolean), notify: $("job-notify").checked ? ["os"] : [],
+    timeout: $("job-timeout").value.trim()};
+  if ($("job-retries").value !== "") body.retries = Number($("job-retries").value);
   body[$("job-kind").value] = $("job-when").value;
-  go.disabled = true; msg.className = "mute"; msg.textContent = "adding…";
-  const r = await api("/noskill/v1/jobs", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  const url = editingId ? "/noskill/v1/jobs/" + editingId + "/edit" : "/noskill/v1/jobs";
+  go.disabled = true; msg.className = "mute"; msg.textContent = editingId ? "saving…" : "adding…";
+  const r = await api(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
   let j = {}; try { j = await r.json(); } catch (x) {}
   go.disabled = false;
   if (r.ok) {
-    msg.className = "ok"; msg.textContent = "Added " + (j.job && j.job.name || "the job") + ", next run " + (j.job ? ago(j.job.next_run_at) : "");
-    for (const id of ["job-target", "job-name", "job-prompt", "job-only"]) $(id).value = "";
+    msg.className = "ok";
+    msg.textContent = (editingId ? "Saved " : "Added ") + (j.job && j.job.name || "the job") + ", next run " + (j.job ? ago(j.job.next_run_at) : "");
+    setEditing(null); clearAddForm();
     refresh();
-  } else { msg.className = "bad"; msg.textContent = (j.error && j.error.message) || "Couldn't add it (" + r.status + ")"; }
+  } else { msg.className = "bad"; msg.textContent = (j.error && j.error.message) || "Couldn't " + (editingId ? "save it" : "add it") + " (" + r.status + ")"; }
 };
 
 // ---- job backups (FR-J6: GET/POST /noskill/v1/jobs/backups, POST /noskill/v1/jobs/restore) ----
@@ -482,6 +608,10 @@ function renderDownloads() {
     table(["Download", "Size", "Seeding", ""], f.map(x => [x.name, size(x.size), x.seeding ? chip("seeding", "warn") : chip("stopped", "ok"), ""])),
     el("div", {class: "row", style: "margin-top:8px"}, el("button", {class: "go", id: "filenow", onclick: fileNow}, "Stop seeding and file now"))] : empty("Nothing finished is waiting."));
 
+  const pg = dl.progress || [];
+  put("dl-progress", pg.length ? table(["Download", "Size", "Progress", "State"], pg.map(x => [
+    x.name, size(x.size), Math.round(x.progress * 100) + "%", x.state === "downloading" ? chip("downloading", "ok") : chip("paused", "warn")])) : empty("Nothing is downloading now."));
+
   const dlist = $("dl-folders");
   if (dlist && dlist.dataset.n !== String((dl.folders || []).length)) {
     dlist.replaceChildren(...(dl.folders || []).map(p => el("option", {value: p})));
@@ -571,6 +701,7 @@ async function refresh() {
     await loadTasks();
     render(d);
     briefTick();
+    if (Date.now() - dmLoaded > 30000 && document.activeElement !== $("draft-model")) loadDraftModel();
     if (!shown) { // first load: the tab in the address, else Approvals when something waits, else Overview
       const h = location.hash.slice(1);
       setTab(h.startsWith("a-") ? "approvals" : TABS.includes(h) ? h : (d.status.approvals || []).length ? "approvals" : "overview");

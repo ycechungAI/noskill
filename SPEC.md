@@ -115,6 +115,8 @@ Detailed in [ORCHESTRATOR.md](docs/ORCHESTRATOR.md). The orchestrator is itself 
 | FR-J4 | P0 | Job results are logged and optionally sent as notifications (OS notification, email, ntfy, Telegram, Discord webhook). |
 | FR-J5 | P1 | **Preconditions**: e.g. "run only if volume `RED` is mounted", "only on AC power", "only on unmetered network". |
 | FR-J6 | P1 | **Back up and restore jobs**: `noskill schedule backup` writes every job's settings (not its runs) to a JSON file in `<data>/backups/`; `schedule restore <name|file>` adds the jobs that aren't there and skips, with a reason, any whose name is taken or that this noskill can't run. A `backup` job kind does it on a schedule, writing nothing when the jobs haven't changed. The status page has both under "Add a job". |
+| FR-J7 | P1 | **Auto fill a job**: the status page's "Add a job" takes a plain-language description (which skill or prompt to run, and when) and a local model fills in the form (What, When, Name, Task, Only when, notify). The filled form is for the user to check and edit; nothing is scheduled until they press Add job. Conditions the model invents that aren't valid are dropped and noted. |
+| FR-J8 | P1 | **Edit jobs and see results**: a job can be edited from the status page's Jobs list (same checks as adding one; it keeps its ID, history and enabled state; it can't be edited while running). The page shows the latest job runs below Jobs as ok (finished), warning (didn't run as planned, or finished but reported problems or needs the user to act) or error (failed, timed out, or interrupted). |
 
 ### 3.7 Interfaces
 

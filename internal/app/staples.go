@@ -19,6 +19,20 @@ var Staples = []Staple{
 	{"nomic-embed-text", "embedding model: skill selection and document search", 0.3},
 }
 
+// RecommendedChat are chat models the Auto fill picker offers to download, best first. The page
+// shows them a few at a time. qwen3.5 and qwen3 aren't here: qwen3.5 is excluded, and qwen3 always
+// reasons, which is too slow for a form fill (AGENTS.md).
+var RecommendedChat = []Staple{
+	{"granite4:3b", "main model: chat and tool use, fast on a laptop", 2.1},
+	{"gemma3:1b", "small and quick: plain chat and summaries", 0.8},
+	{"llama3.2:3b", "small general chat model", 2.0},
+	{"qwen2.5:3b", "small general chat model with good instruction following", 1.9},
+	{"gemma3:4b", "general chat model, larger than gemma3:1b", 3.3},
+	{"qwen2.5-coder:7b", "code-focused chat model", 4.7},
+	{"mistral:7b", "general chat model at 7B", 4.1},
+	{"phi4-mini", "small reasoning-light model for quick answers", 2.5},
+}
+
 // missingStaples are the staples none of the installed models match.
 func missingStaples(have []ModelStatus) []Staple {
 	var out []Staple

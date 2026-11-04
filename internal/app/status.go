@@ -24,6 +24,7 @@ type Status struct {
 	Missing    []Staple         `json:"missing"` // staple models that aren't installed: the page offers to pull them
 	Backends   []BackendStatus  `json:"backends"`
 	Jobs       []JobStatus      `json:"jobs"`
+	JobResults []JobResult      `json:"job_results"` // the latest job runs, newest first
 	JobsPaused bool             `json:"jobs_paused"` // "pause all" is in effect
 	Approvals  []approvals.Item `json:"approvals"`
 	// Volumes are the attached drives, offered as folder suggestions for approval fields (FR-A6).
@@ -71,6 +72,7 @@ type JobStatus struct {
 	Last     string    `json:"last,omitempty"` // status of the latest run
 	LastAt   time.Time `json:"last_at,omitzero"`
 	Running  bool      `json:"running"`
+	Spec     JobSpec   `json:"spec"` // the job as the edit form takes it (FR-J8)
 }
 
 type RunStatus struct {
@@ -146,8 +148,13 @@ func (a *App) Status(ctx context.Context) Status {
 				x.Last, x.LastAt = runs[0].Status, runs[0].EndedAt
 			}
 			x.Running = slices.ContainsFunc(active, func(r scheduler.JobRun) bool { return r.JobID == j.ID })
+			x.Spec = SpecOf(j)
 			st.Jobs = append(st.Jobs, x)
 		}
+	}
+	st.JobResults = []JobResult{}
+	if res, err := a.RecentJobResults(ctx, 20); err == nil {
+		st.JobResults = res
 	}
 	if v, _ := a.DB.GetState(ctx, pausedJobsKey); v != "" && v != "[]" {
 		st.JobsPaused = true

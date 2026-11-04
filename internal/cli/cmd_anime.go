@@ -185,6 +185,23 @@ func cmdAnime(c *cmd, args []string) int {
 		}
 		c.outf("%s\n", rep.String())
 		return ExitOK
+	case "import-filed":
+		if len(args) != 2 {
+			return c.usageErr("usage: noskill anime import-filed <folder with one sub-folder per show>")
+		}
+		added, err := anime.BackfillFiled(ctx, &anime.State{DB: a.DB}, args[1])
+		if err != nil {
+			return c.fail(err)
+		}
+		if c.g.json {
+			c.printJSON(added)
+			return ExitOK
+		}
+		c.outf("Recorded %d episode(s) as filed.\n", len(added))
+		for _, s := range added {
+			c.outf("  %s\n", s)
+		}
+		return ExitOK
 	case "status":
 		st := &anime.State{DB: a.DB}
 		titles, err := st.Titles(ctx)

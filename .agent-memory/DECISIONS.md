@@ -1,5 +1,14 @@
 # Decisions
 
+## 2026-11-04 Auto fill drafts a job; the user still adds it
+**Decision:** The Add a job form gets a describe box and an Auto fill button. The local model only fills the
+form (`POST /noskill/v1/jobs/draft`); the job is added only when the user presses Add job (FR-J7).
+**Why:** A model that mis-reads "every morning" or invents a skill name must not schedule anything on its own.
+The existing AddJob checks still run on submit, so a bad draft is caught before it runs.
+**Alternatives considered:** Auto-adding the job from the description (rejected: no review step); the
+deterministic reminder parser (`chores.ParseReminder`) as the filler (rejected: it covers reminders only,
+and the user asked for a local LLM).
+
 ## 2026-11-03 Honest task verification + monorepo move
 **Decision:** Task honesty gets a deterministic verification layer (`sources:`, `checks:` frontmatter;
 `agent/verify.py`; one bounded retry; run statuses `success|partial|failed`) and the scheduler + orcastrator

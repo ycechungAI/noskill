@@ -22,6 +22,14 @@ type FinishedTorrent struct {
 	Seeding bool   `json:"seeding"` // not stopped yet
 }
 
+// ProgressTorrent is a noskill download still in the torrent app (not finished yet).
+type ProgressTorrent struct {
+	Name     string  `json:"name"`
+	Size     int64   `json:"size"`
+	Progress float64 `json:"progress"` // 0..1
+	State    string  `json:"state"`    // downloading | paused
+}
+
 // FiledEpisode is one stored file, for the History tab.
 type FiledEpisode struct {
 	Title      string    `json:"title"`
@@ -39,7 +47,8 @@ type DownloadsView struct {
 	Problem  string            `json:"problem,omitempty"` // why there's no torrent app
 	Items    []anime.PlanItem  `json:"items"`             // questions and hand-added downloads, newest first
 	Finished []FinishedTorrent `json:"finished"`
-	Filed    []FiledEpisode    `json:"filed"` // newest first
+	Progress []ProgressTorrent `json:"progress"` // noskill's downloads still in the torrent app
+	Filed    []FiledEpisode    `json:"filed"`    // newest first
 	Folders  []string          `json:"folders"`
 }
 
@@ -67,6 +76,18 @@ func (a *App) AnimeDownloads(ctx context.Context) (*DownloadsView, error) {
 		} else {
 			for _, d := range done {
 				v.Finished = append(v.Finished, FinishedTorrent{Hash: d.Hash, Name: d.Name, Size: d.Size, Seeding: !d.Stopped()})
+			}
+		}
+		if all, err := t.Client.All(ctx); err == nil {
+			for _, x := range all {
+				if x.Category == "" || x.Progress >= 1 {
+					continue
+				}
+				state := "paused"
+				if x.State == "downloading" {
+					state = "downloading"
+				}
+				v.Progress = append(v.Progress, ProgressTorrent{Name: x.Name, Size: x.Size, Progress: x.Progress, State: state})
 			}
 		}
 	}

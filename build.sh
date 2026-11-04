@@ -97,6 +97,14 @@ check_deps() {
     missing=1
   fi
 
+  # Command Line Tools alone ship a macOS 27 SDK whose SwiftUI needs a macro plugin they don't
+  # include, so the app fails to compile. The 26.x SDK they also ship builds fine: use it.
+  if [[ -z "${NOSKILL_SDK:-}" ]] && [[ "$(xcode-select -p 2>/dev/null)" == */CommandLineTools ]]; then
+    NOSKILL_SDK="$(ls -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.*.sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk 2>/dev/null | sort -V | tail -1 || true)"
+    [[ -n "$NOSKILL_SDK" ]] && export NOSKILL_SDK
+  fi
+  [[ -n "${NOSKILL_SDK:-}" ]] && printf '  ok   SDK for the app: %s\n' "$NOSKILL_SDK"
+
   need swift "Command Line Tools: xcode-select --install" || missing=1
   need git   "xcode-select --install (or https://git-scm.com)" || missing=1
   need python3 "not strictly required to build; needed at runtime for sched/orcastrator (./build.sh --deps)" || true

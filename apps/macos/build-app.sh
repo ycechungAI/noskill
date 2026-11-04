@@ -19,6 +19,7 @@ if [[ -z "${NOSKILL_APP_SKIP_TESTS:-}" ]]; then
 fi
 
 FLAGS=(-c release --build-system native -Xswiftc -Osize -Xlinker -dead_strip)
+[[ -n "${NOSKILL_SDK:-}" ]] && FLAGS+=(--sdk "$NOSKILL_SDK")
 swift build "${FLAGS[@]}"
 APP=build/noskill.app
 rm -rf "$APP"

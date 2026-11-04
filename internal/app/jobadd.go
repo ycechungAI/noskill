@@ -34,6 +34,15 @@ type JobSpec struct {
 
 // AddJob checks a spec and stores the job. Every problem with the input is a *UserError.
 func (a *App) AddJob(ctx context.Context, in JobSpec) (scheduler.Job, error) {
+	j, err := a.jobFromSpec(ctx, in)
+	if err != nil {
+		return j, err
+	}
+	return (&scheduler.Store{DB: a.DB}).Add(ctx, j)
+}
+
+// jobFromSpec checks a spec and builds the job it describes, without storing it.
+func (a *App) jobFromSpec(ctx context.Context, in JobSpec) (scheduler.Job, error) {
 	bad := func(f string, args ...any) (scheduler.Job, error) {
 		return scheduler.Job{}, &UserError{fmt.Sprintf(f, args...)}
 	}
@@ -172,7 +181,7 @@ func (a *App) AddJob(ctx context.Context, in JobSpec) (scheduler.Job, error) {
 	if j.NextRunAt.IsZero() {
 		return bad("that schedule never comes round")
 	}
-	return (&scheduler.Store{DB: a.DB}).Add(ctx, j)
+	return j, nil
 }
 
 // JobName makes a short name from the target: the skill name, or the prompt's first words.

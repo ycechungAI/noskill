@@ -948,6 +948,124 @@ func TestAddJobFromTheStatusPage(t *testing.T) {
 	}
 }
 
+// Auto fill: the local model drafts a job from a description; nothing is scheduled by the draft.
+func TestDraftJobFromTheStatusPage(t *testing.T) {
+	reply := `{"target":"daily-brief","kind":"cron","when":"0 7 * * 1-5","name":"","prompt":"","only":["ac-power","battery"],"notify":true}`
+	fake := &backendtest.Fake{Reply: func(backends.ChatRequest) (backends.Response, error) { return backends.Response{Content: reply}, nil }}
+	g := newRigWith(t, fake, func(c *config.Config) {
+		c.Server.Tokens = []config.Token{{Name: "chat", Token: "secret:C"}, {Name: "tray", Token: "secret:T", Admin: true}}
+	}, map[string]string{"C": "chat-token-0123456789", "T": "tray-token-0123456789"})
+	chat := map[string]string{"Authorization": "Bearer chat-token-0123456789"}
+	tray := map[string]string{"Authorization": "Bearer tray-token-0123456789"}
+	req := map[string]any{"text": "weekdays at 7 send me the daily brief, only on mains power"}
+
+	if resp, _ := g.do("POST", "/noskill/v1/jobs/draft", req, nil); resp.StatusCode != 401 {
+		t.Errorf("without a token: %d", resp.StatusCode)
+	}
+	if resp, _ := g.do("POST", "/noskill/v1/jobs/draft", req, chat); resp.StatusCode != 403 {
+		t.Errorf("for a chat token: %d", resp.StatusCode)
+	}
+	if resp, _ := g.do("POST", "/noskill/v1/jobs/draft", map[string]any{"text": "  "}, tray); resp.StatusCode != 400 {
+		t.Errorf("empty description: %d", resp.StatusCode)
+	}
+	resp, body := g.do("POST", "/noskill/v1/jobs/draft", req, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"target":"daily-brief"`) || !strings.Contains(string(body), `"kind":"cron"`) || !strings.Contains(string(body), `"when":"0 7 * * 1-5"`) {
+		t.Fatalf("draft: %d %s", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), `"ac-power"`) || strings.Contains(string(body), `"battery"`) || !strings.Contains(string(body), "left out the condition") {
+		t.Errorf("a bad condition should be dropped and noted: %s", body)
+	}
+	if jobs, _ := (&scheduler.Store{DB: g.app.DB}).List(context.Background()); len(jobs) != 0 {
+		t.Errorf("a draft scheduled %d jobs", len(jobs))
+	}
+	if len(fake.Requests) != 1 || fake.Requests[0].Format == nil {
+		t.Errorf("the model should be asked for a schema-shaped reply: %+v", fake.Requests)
+	}
+}
+
+// Editing a job keeps its ID and history, applies the same checks as adding one, and the status
+// carries what the edit form needs plus the latest results (FR-J8).
+func TestEditJobFromTheStatusPage(t *testing.T) {
+	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {
+		c.Server.Tokens = []config.Token{{Name: "tray", Token: "secret:T", Admin: true}}
+	}, map[string]string{"T": "tray-token-0123456789"})
+	tray := map[string]string{"Authorization": "Bearer tray-token-0123456789"}
+
+	resp, body := g.do("POST", "/noskill/v1/jobs", map[string]any{"target": "brief", "cron": "0 7 * * *", "retries": 2}, tray)
+	if resp.StatusCode != 200 {
+		t.Fatalf("add: %d %s", resp.StatusCode, body)
+	}
+	var added struct {
+		Job struct{ ID string } `json:"job"`
+	}
+	json.Unmarshal(body, &added)
+	id := added.Job.ID
+
+	if resp, body := g.do("POST", "/noskill/v1/jobs/"+id+"/edit", map[string]any{"target": "brief", "every": "nope"}, tray); resp.StatusCode != 400 {
+		t.Errorf("a bad schedule should be refused: %d %s", resp.StatusCode, body)
+	}
+	resp, body = g.do("POST", "/noskill/v1/jobs/"+id+"/edit", map[string]any{"target": "brief:12", "every": "6h", "name": "digest", "when": []string{"ac-power"}}, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"name":"digest"`) {
+		t.Fatalf("edit: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := g.do("POST", "/noskill/v1/jobs/nosuchjob/edit", map[string]any{"target": "brief", "every": "6h"}, tray); resp.StatusCode != 400 {
+		t.Errorf("an unknown job: %d", resp.StatusCode)
+	}
+
+	_, body = g.do("GET", "/noskill/v1/status", nil, tray)
+	var st struct {
+		Status struct {
+			Jobs []struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+				Spec struct {
+					Target  string   `json:"target"`
+					Every   string   `json:"every"`
+					Retries *int     `json:"retries"`
+					When    []string `json:"when"`
+				} `json:"spec"`
+			} `json:"jobs"`
+			JobResults []any `json:"job_results"`
+		} `json:"status"`
+	}
+	if err := json.Unmarshal(body, &st); err != nil {
+		t.Fatalf("status: %v %s", err, body)
+	}
+	jobs := st.Status.Jobs
+	if len(jobs) != 1 || jobs[0].ID != id || jobs[0].Name != "digest" {
+		t.Fatalf("the job should keep its ID and take the new name: %s", body)
+	}
+	if sp := jobs[0].Spec; sp.Target != "brief:12" || sp.Every != "6h" || sp.Retries == nil || *sp.Retries != 2 || len(sp.When) != 1 {
+		t.Errorf("the form should be filled from the job, and the retries kept: %+v", sp)
+	}
+	if st.Status.JobResults == nil {
+		t.Errorf("status should carry job_results: %s", body)
+	}
+}
+
+// The Auto fill model is a dropdown choice: automatic, or any installed chat model.
+func TestDraftModelChoiceFromTheStatusPage(t *testing.T) {
+	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {
+		c.Server.Tokens = []config.Token{{Name: "tray", Token: "secret:T", Admin: true}}
+	}, map[string]string{"T": "tray-token-0123456789"})
+	tray := map[string]string{"Authorization": "Bearer tray-token-0123456789"}
+
+	resp, body := g.do("GET", "/noskill/v1/jobs/draft-model", nil, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"choices":["qwen3:4b"]`) || !strings.Contains(string(body), `"chosen":""`) || !strings.Contains(string(body), `"name":"granite4:3b"`) {
+		t.Fatalf("list: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := g.do("POST", "/noskill/v1/jobs/draft-model", map[string]any{"model": "nosuch:1b"}, tray); resp.StatusCode != 400 {
+		t.Errorf("a model that isn't installed: %d", resp.StatusCode)
+	}
+	resp, body = g.do("POST", "/noskill/v1/jobs/draft-model", map[string]any{"model": "qwen3:4b"}, tray)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"chosen":"qwen3:4b"`) {
+		t.Fatalf("choose: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := g.do("POST", "/noskill/v1/jobs/draft-model", map[string]any{"model": ""}, tray); resp.StatusCode != 200 {
+		t.Errorf("back to automatic: %d", resp.StatusCode)
+	}
+}
+
 // Back up and restore jobs from the status page (FR-J6): admin only, by name or by uploaded contents.
 func TestJobBackupsFromTheStatusPage(t *testing.T) {
 	g := newRigWith(t, answerFake("ok"), func(c *config.Config) {

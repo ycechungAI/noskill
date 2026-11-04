@@ -146,6 +146,33 @@ func (s *Store) Add(ctx context.Context, j Job) (Job, error) {
 	return j, err
 }
 
+// Update rewrites a job's settings (FR-J8). The run history and the retry state stay as they are.
+func (s *Store) Update(ctx context.Context, j Job) error {
+	args, _ := json.Marshal(j.Args)
+	notify, _ := json.Marshal(j.Notify)
+	if j.Notify == nil {
+		notify = []byte("[]")
+	}
+	pre, _ := json.Marshal(j.Preconditions)
+	if j.Preconditions == nil {
+		pre = []byte("[]")
+	}
+	res, err := s.DB.ExecContext(ctx, `UPDATE jobs SET name = ?, target_kind = ?, target = ?, args = ?, schedule = ?, missed_policy = ?,
+		overlap_policy = ?, timeout_s = ?, retries = ?, notify = ?, enabled = ?, next_run_at = ?, preconditions = ? WHERE id = ?`,
+		j.Name, j.TargetKind, j.Target, string(args), j.Schedule, j.Missed, j.Overlap, int64(j.Timeout/time.Second), j.Retries,
+		string(notify), boolInt(j.Enabled), ms(j.NextRunAt), string(pre), j.ID)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			return fmt.Errorf("a job named %q already exists", j.Name)
+		}
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNoJob
+	}
+	return nil
+}
+
 func boolInt(b bool) int {
 	if b {
 		return 1

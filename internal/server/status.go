@@ -52,6 +52,70 @@ func (s *Server) addJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "job": j})
 }
 
+// draftJob fills in the Add a job form from {"text": a plain-language description} with the local model.
+func (s *Server) draftJob(w http.ResponseWriter, r *http.Request) {
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(body, &in); err != nil {
+		s.fail(w, r, bad(`send {"text": what the job should do and when}`))
+		return
+	}
+	d, err := s.App.DraftJob(r.Context(), in.Text)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "draft": d})
+}
+
+// draftModel reports the Auto fill model choice: GET for the choice, POST {"model": name} to set it ("" = automatic).
+func (s *Server) draftModel(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		writeJSON(w, http.StatusOK, s.App.DraftModelInfo(r.Context()))
+		return
+	}
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(body, &in); err != nil {
+		s.fail(w, r, bad(`send {"model": an installed chat model, or "" for automatic}`))
+		return
+	}
+	if err := s.App.SetDraftModel(r.Context(), in.Model); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.App.DraftModelInfo(r.Context()))
+}
+
+// editJob rewrites a job from the same spec as adding one (FR-J8). Its history and enabled state stay.
+func (s *Server) editJob(w http.ResponseWriter, r *http.Request) {
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	var in app.JobSpec
+	if err := json.Unmarshal(body, &in); err != nil {
+		s.fail(w, r, bad(`send the job's settings, as for adding one`))
+		return
+	}
+	j, err := s.App.UpdateJob(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "job": j})
+}
+
 // listJobBackups lists the backups folder, newest first (FR-J6).
 func (s *Server) listJobBackups(w http.ResponseWriter, r *http.Request) {
 	list, err := s.App.ListJobBackups()

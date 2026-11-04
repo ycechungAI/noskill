@@ -60,6 +60,47 @@ _Last updated: 2026-11-03 by Flint (OpenCode) after the monorepo move + task-ver
   forget when adding a new `cmd/` entry point.
 - After `git subtree add`, file owner/perm bits can be off: `chmod -R u+rwX` on the added dirs.
 
+## Update 2026-11-04: Auto fill for Add a job (FR-J7)
+
+- The noskill status page's Overview → Jobs → "Add a job" now starts with a describe box and an **Auto fill**
+  button. `POST /noskill/v1/jobs/draft` (admin) asks the local chat model (`authorModel`, same as learning
+  passes) for a schema-constrained JSON draft and fills the form. Nothing is scheduled until the user edits
+  and presses Add job. Invalid preconditions are dropped and reported in `notes`.
+- Code: `internal/app/jobdraft.go` (DraftJob, prompt, schema), `internal/server/status.go` (draftJob),
+  `internal/server/server.go` (route), `internal/server/ui/index.html` (describe box, Auto fill JS).
+- Tests: `TestDraftJobFromTheStatusPage` in `internal/server/server_test.go`. `go vet ./...` and `go test ./...`
+  pass; vet is clean on all six targets.
+- Docs: SPEC.md FR-J7, docs/PROXY.md route row.
+- Not yet live-checked against a real model (Ollama). Next: run Auto fill once in the browser with granite4:3b and
+  check the filled fields for a skill job, a cron job and a `brief`/`remind:` job.
+
+## Update 2026-11-04 (edit jobs, job results)
+
+- Jobs can be edited on the status page (FR-J8): `POST /noskill/v1/jobs/{id}/edit`, same checks as adding
+  (`app.jobFromSpec`), keeps ID/history/enabled, refused while running. Form gained Retries and Timeout.
+  Code: `internal/app/jobedit.go`, `scheduler.Store.Update`, `server/status.go` (editJob), `ui/index.html`.
+- Job results box under Jobs (`s-results`): latest 20 runs with ok / warning / error. Status carries
+  `job_results` and each job's `spec` (form values).
+- Honest-status rule (heuristic, `needsAttention` in jobedit.go): a `done` run whose text says "problems",
+  "can't reach", "didn't answer", "couldn't", "please add", "i need to" shows as warning. Real data showed
+  `anime-nightly` reporting done while Transmission didn't answer. The run status itself still says done:
+  the scheduler should record a partial status like the sched side does (open).
+- Found, not fixed: Transmission remote access is off (user setting, port 9091); a model reply that was a plan
+  ("I need to list…") was stored as done (stage-download-anime-tracker).
+- Side effect of testing: starting `noskill serve` without `-no-jobs` ran the catch-up jobs at 04:35
+  (anime-nightly, diskwatch, docs-refresh, stage-download-anime-tracker). Test servers now use `-no-jobs`.
+  The DMG check also left NoskillApp running (with its sched and orcastrator).
+- Open: the Swift app's Ollama pane has no Auto fill picker; the edit form and results box are in the web page only.
+
+## Update 2026-11-04 (build without Xcode)
+
+- Command Line Tools' macOS 27 SDK fails to compile the app (`SwiftUIMacros.StateMacro` plugin missing).
+  `build.sh` now picks the newest CLT macOS 26.x SDK when Xcode isn't selected (`NOSKILL_SDK` overrides it);
+  `build-app.sh` and `test.sh` honour it. `./build.sh` builds `apps/macos/build/noskill-0.2.0.dmg` on CLT only.
+- Open: the Auto fill model picker lives in the web page's Models section; the app's Ollama pane has no picker
+  yet (needs the Swift side, written and built against the 26.5 SDK).
+- Open: the recommended-model Pull path in the Models section is not yet tried in a browser.
+
 ## Update 2026-11-03
 
 - Monorepo move landed (commit `a35c89c`); runtime state migrated, venvs rebuilt, services restarted from
